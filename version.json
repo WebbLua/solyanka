@@ -3,7 +3,8 @@
   "version_date": "23.01.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
-      "Lavrentiy_Beria": true
+      "Lavrentiy_Beria": true,
+      "Test_Script": false
   },
   "version_label": {
              "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
