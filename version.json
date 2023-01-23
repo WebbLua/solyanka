@@ -3,10 +3,10 @@
   "version_date": "23.01.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua?token=GHSAT0AAAAAAB5AFPHXJ3H6TMLSZ6VEJR7WY6OLZKQ",
   "version_access": {
-      "Cody_Webb",
-      "Lavrentiy_Beria",
-      "vodka",
-      "Sebastian_Melgaard"
+      "Cody_Webb": true,
+      "Lavrentiy_Beria": true,
+      "vodka": true,
+      "Sebastian_Melgaard": true
   },
   "version_label": {
              "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
