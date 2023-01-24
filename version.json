@@ -1,6 +1,6 @@
 {
-  "version_num": 1,
-  "version_date": "23.01.2023",
+  "version_num": 2,
+  "version_date": "24.01.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
       "Lavrentiy_Beria": true,
@@ -13,6 +13,7 @@
              "vodka": {"color": "0xFFB30000", "text": "Основатель скрипта"}
   },
    "version_upd": {
-             "1": "Первая версия"
+             "1": "Первая версия",
+             "2": "Добавлено множество функций, похуй кароче"
   }       
 }
