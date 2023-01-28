@@ -1,11 +1,12 @@
 {
-  "version_num": 2,
-  "version_date": "24.01.2023",
+  "version_num": 3,
+  "version_date": "28.01.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
       "Lavrentiy_Beria": true,
       "Test_Script": true,
-      "Cody_Webb": true
+      "Cody_Webb": true,
+      "Al_Papo": true
   },
   "version_label": {
              "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
@@ -14,7 +15,6 @@
              "vodka": {"color": "0xFFB30000", "text": "Основатель скрипта"}
   },
    "version_upd": {
-             "1": "Первая версия",
-             "2": "Добавлено множество функций, похуй кароче"
+             "1": "Дохуя всяких функций, мне просто лень писать єто всё"
   }       
 }
