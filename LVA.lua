@@ -1,7 +1,7 @@
 script_name('Las-Venturas Army')
 script_author("Cody_Webb | Telegram: @Imykhailovich")
-script_version("24.01.2023")
-script_version_number(2)
+script_version("28.01.2023")
+script_version_number(8)
 local script = {checked = false, available = false, update = false, noaccess = false, v = {date, num}, url, access = {}, reload, loaded, unload, upd = {changes = {}, sort = {}}, label = {}}
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
