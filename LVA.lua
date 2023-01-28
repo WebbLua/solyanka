@@ -9,7 +9,9 @@ local imgui = require 'imgui'
 imgui.ToggleButton = require('imgui_addons').ToggleButton
 local vkeys = require 'vkeys'
 local rkeys = require 'rkeys'
+local regex = require 'rex_pcre'
 local inicfg = require 'inicfg'
+local dlstatus = require "moonloader".download_status
 local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
@@ -26,7 +28,9 @@ local config = {
 		autocl = false
 	},
 	hotkey = {
-		clist = '0'
+		clist = '0',
+		ration = '0',
+		zdrav = '0'
 	},
 	values = {
 		tag = "",
@@ -45,23 +49,24 @@ local menu = { -- imgui-меню
 	main = imgui.ImBool(false),
 	settings = imgui.ImBool(true),
 	information = imgui.ImBool(false),
-	commands = imgui.ImBool(false)
+	commands = imgui.ImBool(false),
+	target = imgui.ImBool(false)
 }
 imgui.ShowCursor = false
 
 local style = imgui.GetStyle()
 local colors = style.Colors
 local clr = imgui.Col
-local currentNick
 local suspendkeys = 2 -- 0 хоткеи включены, 1 -- хоткеи выключены -- 2 хоткеи необходимо включить
 local ImVec4 = imgui.ImVec4
 local imfonts = {mainFont = nil, smallmainFont = nil, memfont = nil}
+local targetId, targetNick
 
 local tag = ""
 local a = ""
 local fuelTextDraw = 0
-local currentFuel = 0
-local currentPickup = 0
+local currentNick
+local currentFuel, currentPickup = 0, 0
 local isarmtaken = false
 local partimer = 0
 
@@ -86,12 +91,18 @@ local clists = {
 		"[30] Серый", "[31] Серебро", "[32] Чёрный", "[33] Белый"
 	}
 }
+
+local zv = {
+	"Рядовой", "Ефрейтор", "Младший сержант", "Сержант", "Старший сержант", 
+	"Старшина", "Прапорщик", "Младший лейтенант", "Лейтенант", "Старший лейтенант", 
+	"Капитан", "Майор", "Подполковник", "Полковник", "Генерал"
+}
 -------------------------------------------------------------------------[MAIN]--------------------------------------------------------------------------------------------
 function main()
 	if not isSampLoaded() or not isSampfuncsLoaded() then return end
 	while not isSampAvailable() do wait(0) end
 	
-	repeat wait(0) until sampGetCurrentServerName() ~= "SA-MP"
+	while sampGetCurrentServerName() == "SA-MP" do wait(0) end
 	server = sampGetCurrentServerName():gsub('|', '')
 	server = (server:find('02') and 'Two' or (server:find('Revo') and 'Revolution' or (server:find('Legacy') and 'Legacy' or (server:find('Classic') and 'Classic' or nil))))
     if server == nil then chatmsg(u8:decode'Данный сервер не поддерживается, выгружаюсь...') script.unload = true thisScript():unload() end
@@ -133,7 +144,7 @@ function main()
 			end 
 		end
 		suspendkeys = 1 
-		menu.main.v = not menu.main.v 
+		menu.main.v = not menu.main.v
 	end)
 	
 	sampRegisterChatCommand('armyup', updateScript)
@@ -150,14 +161,12 @@ function main()
 	sampRegisterChatCommand("pribil", cmd_prib)
 	
 	script.loaded = true
-	repeat wait(0) until sampIsLocalPlayerSpawned()
+	while sampGetGamestate() ~= 3 do wait(0) end
+	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
 	checkUpdates()
 	chatmsg(u8:decode"Скрипт запущен. Открыть главное меню - /lva")
-	needtoreload = true
-	
 	imgui.Process = true
-	imgui.ShowCursor = false
-	
+	needtoreload = true
 	
 	chatManager.initQueue()
 	lua_thread.create(chatManager.checkMessagesQueueThread)
@@ -165,6 +174,8 @@ function main()
 		wait(0)
 		if suspendkeys == 2 then
 			rkeys.registerHotKey(makeHotKey('clist'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end setclist() end)
+			rkeys.registerHotKey(makeHotKey('ration'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSetChatInputEnabled(true) sampSetChatInputText("/f " .. tag .. " ") end)
+			rkeys.registerHotKey(makeHotKey('zdrav'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end hello() end)
 			suspendkeys = 0
 		end
 		if not menu.main.v then 
@@ -187,6 +198,99 @@ function main()
 							chatManager.addMessageToQueue("/clist 7")
 						end
 					end
+				end
+			end
+		end
+		local res, targetHandle = getCharPlayerIsTargeting(playerHandle)
+		if res then
+			if getCurrentCharWeapon(PLAYER_PED) == 0 then
+				_, targetId = sampGetPlayerIdByCharHandle(targetHandle)
+				if _ then
+					targetNick = sampGetPlayerNickname(targetId)
+					menu.target.v = true
+					else
+					menu.target.v = false
+				end
+				else
+				menu.target.v = false
+			end
+			else
+			menu.target.v = false
+		end
+		if menu.target.v then
+			if wasKeyPressed(vkeys.VK_O) then
+				if targetNick ~= nil and targetId ~= nil then
+					offNick = u8:decode(targetNick)
+					local temp = os.tmpname()
+					local time = os.time()
+					local found = false
+					downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
+						if (status == 58) then
+							local file = io.open(temp, "r")
+							local currentRank
+							for line in file:lines() do
+								line = encoding.UTF8:decode(line)
+								local offrank, offtm, offwm, offdate = line:match('%["' .. offNick .. '",(%d+),%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]')
+								if tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
+									found = true
+									currentRank = tonumber(offrank)
+								end
+							end
+							if not found then chatmsg(u8:decode"Ранг " .. offNick .. u8:decode" не найден!") end
+							file:close()
+							os.remove(temp)
+							if found then
+								chatManager.addMessageToQueue("Здравия желаю, товарищ " .. zv[currentRank] .. " " .. offNick:match(".*%_(.*)") .. "!")
+							end
+							else
+							if (os.time() - time > 10) then
+								chatmsg("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
+								return
+							end
+						end
+					end)
+					else
+					chatmsg(u8:decode"Произошла ошибка, попробуйте ещё раз")
+				end
+			end
+			if wasKeyPressed(vkeys.VK_J) then
+				if targetNick ~= nil and targetId ~= nil then
+					offNick = u8:decode(targetNick)
+					local temp = os.tmpname()
+					local time = os.time()
+					local found = false
+					downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
+						if (status == 58) then
+							local file = io.open(temp, "r")
+							local currentRank, myRank
+							local mynick = u8:decode(sampGetPlayerNickname(select(2,sampGetPlayerIdByCharHandle(PLAYER_PED))))
+							for line in file:lines() do
+								line = encoding.UTF8:decode(line)
+								local offrank, offtm, offwm, offdate = line:match('%["' .. offNick .. '",(%d+),%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]')
+								local myrank, mytm, mywm, mydate = line:match('%["' .. mynick .. '",(%d+),%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]')
+								if tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
+									found = true
+									currentRank = tonumber(offrank)
+								end
+								if tonumber(myrank) ~= nil and tonumber(mytm) ~= nil and tonumber(mywm) ~= nil and mydate ~= nil then
+									myRank = tonumber(myrank)
+								end
+							end
+							if not found then chatmsg(u8:decode"Ранг " .. offNick .. u8:decode" не найден!") end
+							file:close()
+							os.remove(temp)
+							if found then
+								chatManager.addMessageToQueue("Товарищ " .. zv[currentRank] .. " " .. offNick:match(".*%_(.*)") .. ", товарищ " .. (zv[myRank] ~= nil and zv[myRank] or "") .. " " .. mynick:match(".*%_(.*)") .. " по вашему приказу прибыл!")
+							end
+							else
+							if (os.time() - time > 10) then
+								chatmsg("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
+								return
+							end
+						end
+					end)
+					else
+					chatmsg(u8:decode"Произошла ошибка, попробуйте ещё раз")
 				end
 			end
 		end
@@ -358,6 +462,12 @@ function imgui.OnDrawFrame()
 				lva_ini.values.clist = tostring(u8:decode(buffer.clist.v)) 
 				inicfg.save(lva_ini, settings) 
 			end
+			imgui.Hotkey("hotkey1", "ration", 100) 
+			imgui.SameLine() 
+			imgui.Text("Написать в рацию\n(Будет открыта строка чата с /f [Tag])")
+			imgui.Hotkey("hotkey2", "zdrav", 100) 
+			imgui.SameLine() 
+			imgui.Text("Поприветствовать солдата в рацию\n(Если он напишет 'Здравия желаю часть' и.т.д)") 
 			imgui.PopItemWidth()
 			imgui.PopFont()
 			
@@ -495,6 +605,25 @@ function imgui.OnDrawFrame()
 		imgui.End()
 		imgui.PopFont()
 	end
+	
+	imgui.SwitchContext() -- Overlay
+	colors[clr.WindowBg] = ImVec4(0, 0, 0, 0)
+	local SetModeCond = SetMode and 0 or 4
+	
+	if menu.target.v then
+		if not SetMode then imgui.SetNextWindowPos(imgui.ImVec2(500, 500)) else if SetModeFirstShow then imgui.SetNextWindowPos(imgui.ImVec2(500, 500)) end end -- таргет-меню
+		imgui.Begin('#empty_field', menu.target, 1 + 32 + 2 + SetModeCond + 64)
+		imgui.PushFont(imfonts.mainFont)
+		if targetId ~= nil and targetNick ~= nil then
+			local targetClist = "{" .. ("%06x"):format(bit.band(sampGetPlayerColor(targetId), 0xFFFFFF)) .. "}"
+			imgui.TextColoredRGB('Текущая цель: ' .. (targetClist ~= nil and targetClist or '') .. targetNick .. '[' .. targetId .. ']')
+			imgui.TextColoredRGB('O' .. ' - Здравия желаю')
+			imgui.TextColoredRGB('J' .. ' - По вашему приказу прибыл')
+		end
+		imgui.PopFont()
+		imgui.End()
+	end
+	
 end
 -------------------------------------------------------------------------[ФУНКЦИИ]-----------------------------------------------------------------------------------------
 function ev.onServerMessage(col, text)
@@ -655,32 +784,6 @@ function ev.onSendCommand(message)
 	chatManager.updateAntifloodClock()
 end
 
-function offmembers()
-	check.rmembers = {}
-	local temp = os.tmpname()
-	local time = os.time()
-	downloadUrlToFile("https://docs.google.com/spreadsheets/u/0/d/1hVwvPBD5PJT3CrHvsOIWGtJigGmMT5UfmgZsPJfu_Hk/export?format=tsv", temp, function(_, status)
-		if (status == 58) then
-			local file = io.open(temp, "r")
-			for line in file:lines() do
-				line = encoding.UTF8:decode(line)
-				local template = "(%w+_%w+)\t(.+)"
-				if (line:find(template)) then
-					local name, office = line:match(template)
-					check.rmembers[name] = office
-				end
-			end
-			file:close()
-			os.remove(temp)
-			else
-			if (os.time() - time > 10) then
-				chatmsg("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
-				return
-			end
-		end
-	end)
-end
-
 function sampGetPlayerIdByNickname(name)
 	local name = tostring(name)
 	local _, localId = sampGetPlayerIdByCharHandle(PLAYER_PED)
@@ -792,6 +895,34 @@ function setclist()
 			if newmyclist == nil then chatmsg(u8:decode"Не удалось узнать номер своего цвета") return end
 			if newmyclist ~= 0 then chatmsg(u8:decode"Клист не был снят") return end
 		end
+	end)
+end
+
+function hello()
+	lua_thread.create(function()
+		wait(0)
+		local A_Index = 0
+		while true do
+			if A_Index == 30 then break end
+			local str = sampGetChatString(99 - A_Index)
+			local re1 = regex.new(u8:decode" \\{8470FF\\}(.*) \\{.*\\}(.*)\\_(.*)\\[(.*)\\]\\{8470FF\\}:  (.*)((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*))")
+			local re2 = regex.new(u8:decode" (.*)  (.*)\\_(.*)\\[(.*)\\]:  (.*)((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*))")
+			local zvanie, _, surname
+			zvanie, _, surname = re1:match(str)
+			if zvanie == nil then
+				zvanie, _, surname = re2:match(str)
+			end
+			
+			if zvanie ~= nil then
+				local ranksnesokr = {["Ст.сержант"] = "Старший сержант", ["Мл.сержант"] = "Младший сержант", ["Ст.Лейтенант"] = "Старший лейтенант", ["Мл.Лейтенант"] = "Младший лейтенант"}
+				local pRank = ranksnesokr[zvanie] ~= nil and ranksnesokr[zvanie] or zvanie
+				chatManager.addMessageToQueue("/f " .. tag .. " Здравия желаю, товарищ " .. pRank .. " " .. surname .. "!")
+				return
+			end
+			A_Index = A_Index + 1
+		end
+		
+		chatmsg(u8:decode"Никто не здоровался в рацию!")
 	end)
 end
 
@@ -946,7 +1077,7 @@ function checkUpdates() -- проверка обновлений
 	local fpath = os.tmpname()
 	if doesFileExist(fpath) then os.remove(fpath) end
 	downloadUrlToFile("https://raw.githubusercontent.com/WebbLua/LVA/main/version.json", fpath, function(_, status, _, _)
-		if status == 58 then
+		if status == dlstatus.STATUSEX_ENDDOWNLOAD then
 			if doesFileExist(fpath) then
 				local file = io.open(fpath, 'r')
 				if file then
@@ -958,9 +1089,8 @@ function checkUpdates() -- проверка обновлений
 					script.url = info.version_url
 					script.access = info.version_access
 					if script.access ~= {} then
-						local mynick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
-						if script.access[mynick] ~= nil then
-							if not script.access[mynick] then
+						if script.access[currentNick] ~= nil then
+							if not script.access[currentNick] then
 								os.remove("Moonloader\\LVA.lua")
 								chatmsg(u8:decode"Вы в blacklist'e, скрипт удалён")
 								script.noaccess = true
@@ -1033,6 +1163,7 @@ end
 
 function onScriptTerminate(s, bool)
 	if s == thisScript() and not bool then
+		imgui.Process = false
 		for i = 0, 1000 do
 			if textlabel[i] ~= nil then
 				sampDestroy3dText(textlabel[i])
@@ -1058,4 +1189,5 @@ function onScriptTerminate(s, bool)
 		end
 	end			
 end
+
 
