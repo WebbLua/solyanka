@@ -4,7 +4,8 @@
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
       "Lavrentiy_Beria": true,
-      "Test_Script": true
+      "Test_Script": true,
+      "Cody_Webb": true
   },
   "version_label": {
              "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
