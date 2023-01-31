@@ -1,10 +1,11 @@
 {
-  "version_num": 3,
-  "version_date": "28.01.2023",
+  "version_num": 4,
+  "version_date": "31.01.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
       "Lavrentiy_Beria": true,
-      "Test_Script": true
+      "Test_Script": true,
+      "Andrey_Pestov": true
   },
   "version_label": {
              "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
@@ -13,6 +14,8 @@
              "vodka": {"color": "0xFFB30000", "text": "Основатель скрипта"}
   },
    "version_upd": {
-             "1": "Дохуя всяких функций, мне просто лень писать єто всё"
+             "1": "Реализован автодоклад на КПП + команда /prib",
+             "2": "Реализована команда /port",
+             "3": "Реализована команда /viezd",
   }       
 }
