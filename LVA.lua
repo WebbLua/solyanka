@@ -25,7 +25,8 @@ local config = {
 		bp = false,
 		tp = false,
 		elevator = false,
-		autocl = false
+		autocl = false,
+		fcol = false
 	},
 	hotkey = {
 		clist = '0',
@@ -67,8 +68,10 @@ local a = ""
 local fuelTextDraw = 0
 local currentNick
 local currentFuel, currentPickup = 0, 0
+local lastPost
 local isarmtaken = false
 local partimer = 0
+local checkpoint = {[1] = nil, [2] = nil}
 
 local clists = {
 	numbers = {
@@ -97,6 +100,17 @@ local zv = {
 	"Старшина", "Прапорщик", "Младший лейтенант", "Лейтенант", "Старший лейтенант", 
 	"Капитан", "Майор", "Подполковник", "Полковник", "Генерал"
 }
+
+local posts = {
+	{"КПП-1", 124, 1923, 185, 1965},
+	{"КПП-2", 83, 1911, 112, 1933},
+	{"ШП", 131, 1830, 157, 1861},
+	{"МС", 140, 1801, 271, 1829},
+	{"Переход", 272, 1776, 303, 1837},
+	{"Сетка", 324, 1776, 361, 1835},
+	{"ГС", 317, 1916, 387, 2005},
+	{"Ангары", 262, 1927, 295, 2041}
+}
 -------------------------------------------------------------------------[MAIN]--------------------------------------------------------------------------------------------
 function main()
 	if not isSampLoaded() or not isSampfuncsLoaded() then return end
@@ -105,7 +119,7 @@ function main()
 	while sampGetCurrentServerName() == "SA-MP" do wait(0) end
 	server = sampGetCurrentServerName():gsub('|', '')
 	server = (server:find('02') and 'Two' or (server:find('Revo') and 'Revolution' or (server:find('Legacy') and 'Legacy' or (server:find('Classic') and 'Classic' or nil))))
-    if server == nil then chatmsg(u8:decode'Данный сервер не поддерживается, выгружаюсь...') script.unload = true thisScript():unload() end
+    if server == nil then script.sendMessage('Данный сервер не поддерживается, выгружаюсь...') script.unload = true thisScript():unload() end
 	currentNick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
 	
 	AdressConfig = string.format("%s\\config", thisScript().directory)
@@ -120,7 +134,7 @@ function main()
 		inicfg.save(lva_ini, settings)
 	end
 	
-	tag = lva_ini.values.tag ~= "" and lva_ini.values.tag or ""
+	tag = lva_ini.values.tag ~= "" and lva_ini.values.tag .. " " or ""
 	a = lva_ini.bools.sex and "а" or ""
 	
 	togglebools = {
@@ -129,7 +143,8 @@ function main()
 		bp = lva_ini.bools.bp and imgui.ImBool(true) or imgui.ImBool(false),
 		tp = lva_ini.bools.tp and imgui.ImBool(true) or imgui.ImBool(false),
 		elevator = lva_ini.bools.elevator and imgui.ImBool(true) or imgui.ImBool(false),
-		autocl = lva_ini.bools.autocl and imgui.ImBool(true) or imgui.ImBool(false)
+		autocl = lva_ini.bools.autocl and imgui.ImBool(true) or imgui.ImBool(false),
+		fcol = lva_ini.bools.fcol and imgui.ImBool(true) or imgui.ImBool(false)
 	}
 	buffer = {
 		clist = imgui.ImInt(lva_ini.values.clist),
@@ -148,15 +163,14 @@ function main()
 	end)
 	
 	sampRegisterChatCommand('armyup', updateScript)
-	sampRegisterChatCommand('vzyal', takeVehicle)
-	sampRegisterChatCommand('zas', function() post(enter) end)
-	sampRegisterChatCommand('zastupil', function() post(enter) end)
-	sampRegisterChatCommand('pok', function() post(leave) end)
-	sampRegisterChatCommand('pokinul', function() post(leave) end)
+	sampRegisterChatCommand('vzyal', cmd_vzyal)
+	sampRegisterChatCommand('zas', cmd_zas)
+	sampRegisterChatCommand('zastupil', cmd_zas)
+	sampRegisterChatCommand('pok', cmd_pok)
+	sampRegisterChatCommand('pokinul', cmd_pok)
 	sampRegisterChatCommand("gorod", cmd_gorod)
 	sampRegisterChatCommand("viezd", cmd_viezd)
 	sampRegisterChatCommand("port", cmd_port)
-	sampRegisterChatCommand("patrul", cmd_patrul)
 	sampRegisterChatCommand("prib", cmd_prib)
 	sampRegisterChatCommand("pribil", cmd_prib)
 	
@@ -164,7 +178,7 @@ function main()
 	while sampGetGamestate() ~= 3 do wait(0) end
 	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
 	checkUpdates()
-	chatmsg(u8:decode"Скрипт запущен. Открыть главное меню - /lva")
+	script.sendMessage("Скрипт запущен. Открыть главное меню - /lva")
 	imgui.Process = true
 	needtoreload = true
 	
@@ -172,12 +186,14 @@ function main()
 	lua_thread.create(chatManager.checkMessagesQueueThread)
 	while true do
 		wait(0)
+		
 		if suspendkeys == 2 then
 			rkeys.registerHotKey(makeHotKey('clist'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end setclist() end)
-			rkeys.registerHotKey(makeHotKey('ration'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSetChatInputEnabled(true) sampSetChatInputText("/f " .. tag .. " ") end)
+			rkeys.registerHotKey(makeHotKey('ration'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSetChatInputEnabled(true) sampSetChatInputText("/f " .. u8(tag)) end)
 			rkeys.registerHotKey(makeHotKey('zdrav'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end hello() end)
 			suspendkeys = 0
 		end
+		
 		if not menu.main.v then 
 			imgui.ShowCursor = false
 			if suspendkeys == 1 then 
@@ -185,7 +201,9 @@ function main()
 				sampSetChatDisplayMode(3) 
 			end
 		end
+		
 		textLabelOverPlayerNickname()
+		
 		if needtocl7 and isCharInArea2d(PLAYER_PED, -84, 1606, 464, 2148, false) then
 			needtocl7 = false
 			if lva_ini.bools.cl7 then
@@ -194,13 +212,21 @@ function main()
 					local result2, sid = sampGetPlayerSkin(myid)
 					if result2 then
 						if sid ~= 287 and sid ~= 191 then
-							chatmsg(u8:decode"Вы заехали на базу, надеваю клист...")
+							script.sendMessage("Вы заехали на базу, надеваю клист...")
 							chatManager.addMessageToQueue("/clist 7")
 						end
 					end
 				end
 			end
 		end
+		
+		local x, y, z = getCharCoordinates(PLAYER_PED)
+		for i, v in ipairs(posts) do
+			if (x >= v[2]) and (y >= v[3]) and (x <= v[4]) and (y <= v[5]) then
+				lastPost = v[1]
+			end
+		end
+		
 		local res, targetHandle = getCharPlayerIsTargeting(playerHandle)
 		if res then
 			if getCurrentCharWeapon(PLAYER_PED) == 0 then
@@ -217,6 +243,7 @@ function main()
 			else
 			menu.target.v = false
 		end
+		
 		if menu.target.v then
 			if wasKeyPressed(vkeys.VK_O) then
 				if targetNick ~= nil and targetId ~= nil then
@@ -236,7 +263,7 @@ function main()
 									currentRank = tonumber(offrank)
 								end
 							end
-							if not found then chatmsg(u8:decode"Ранг " .. offNick .. u8:decode" не найден!") end
+							if not found then script.sendMessage("Ранг " .. offNick .. " не найден!") end
 							file:close()
 							os.remove(temp)
 							if found then
@@ -244,13 +271,13 @@ function main()
 							end
 							else
 							if (os.time() - time > 10) then
-								chatmsg("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
+								script.sendMessage("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
 								return
 							end
 						end
 					end)
 					else
-					chatmsg(u8:decode"Произошла ошибка, попробуйте ещё раз")
+					script.sendMessage("Произошла ошибка, попробуйте ещё раз")
 				end
 			end
 			if wasKeyPressed(vkeys.VK_J) then
@@ -276,7 +303,7 @@ function main()
 									myRank = tonumber(myrank)
 								end
 							end
-							if not found then chatmsg(u8:decode"Ранг " .. offNick .. u8:decode" не найден!") end
+							if not found then script.sendMessage("Ранг " .. offNick .. " не найден!") end
 							file:close()
 							os.remove(temp)
 							if found then
@@ -284,13 +311,13 @@ function main()
 							end
 							else
 							if (os.time() - time > 10) then
-								chatmsg("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
+								script.sendMessage("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
 								return
 							end
 						end
 					end)
 					else
-					chatmsg(u8:decode"Произошла ошибка, попробуйте ещё раз")
+					script.sendMessage("Произошла ошибка, попробуйте ещё раз")
 				end
 			end
 		end
@@ -476,7 +503,7 @@ function imgui.OnDrawFrame()
 			imgui.PushItemWidth(120)
 			if imgui.InputText('##tag', buffer.tag) then 
 				lva_ini.values.tag = tostring(u8:decode(buffer.tag.v))
-				tag = lva_ini.values.tag ~= "" and lva_ini.values.tag or ""
+				tag = lva_ini.values.tag ~= "" and lva_ini.values.tag .. " " or ""
 				inicfg.save(lva_ini, settings) 
 			end 
 			imgui.PopItemWidth() 
@@ -524,6 +551,18 @@ function imgui.OnDrawFrame()
 			imgui.SameLine() 
 			imgui.Text("'Автоклист' - автомаитчески вводить клист после: нач.раб.дня, завершения раб.дня, смерти")
 			
+			if imgui.ToggleButton("fcol", togglebools.fcol) then 
+				lva_ini.bools.fcol = togglebools.fcol.v
+				inicfg.save(lva_ini, settings)
+			end
+			imgui.SameLine() 
+			imgui.Text("Окрашивать ник и ID в чате фракции в цвет клиста")
+			if imgui.IsItemHovered() then 
+				imgui.BeginTooltip() 
+				imgui.TextUnformatted("Если есть другие скрипты с этой функцией, НАСТОЯТЕЛЬНО рекомендую отключить в них её! Что бы потом не было вопросов") 
+				imgui.EndTooltip() 
+			end
+			
 			imgui.EndChild()
 		end
 		
@@ -553,8 +592,8 @@ function imgui.OnDrawFrame()
 				"/lva - открыть главное меню скрипта",
 				"/armyup - обновить скрипт",
 				"/vzyal - взять транспорт (грузовик/вертолёт)",
-				"/zas (/zastupil) - заступить на пост (нужно находится на посту)",
-				"/pok (/pokinul) - покинуть пост (последний пост)",
+				"/zas [состав] - заступить на пост (нужно находится на посту)",
+				"/pok [состав] [причина] - покинуть пост (последний пост)",
 				"/gorod - доложить о вывозе бойцов в город",
 				"/viezd - доложить о выезде колонны ВМО",
 				"/port - доложить о выезде в порт",
@@ -593,7 +632,7 @@ function imgui.OnDrawFrame()
 		end
 		if not found then
 			if imgui.Button("Cody Webb сейчас не в сети", imgui.ImVec2(260.0, 30.0)) then
-				chatmsg(u8:decode"Cody Webb играет на Revolution (сейчас не онлайн)", main_color)
+				script.sendMessage("Cody Webb играет на Revolution (сейчас не онлайн)", main_color)
 			end
 		end
 		
@@ -635,6 +674,97 @@ function ev.onServerMessage(col, text)
 				elseif text:match(u8:decode"^ Рабочий день начат") then
 				if tostring(lva_ini.values.clist) ~= nil then
 					chatManager.addMessageToQueue("/clist " .. tostring(lva_ini.values.clist))
+				end
+			end
+		end
+		if lva_ini.bools.fcol then -- окраска ников в чате фракции
+			local frank, fnick, fid, ftxt = text:match(u8:decode"^ (.*)  (.*)%[(%d+)%]%: (.*)")
+			if fid ~= nil and col == -1920073729 then
+				local color = "{" .. bit.tohex(bit.rshift(col, 8), 6) .. "}"
+				local clist = "{" .. ("%06x"):format(bit.band(sampGetPlayerColor(fid), 0xFFFFFF)) .. "}"
+				text = " " .. color .. frank .. " " .. clist .. fnick .. "[" .. fid .. "]" .. color .. ": " .. ftxt .. ""
+				return {col, text}
+			end
+		end
+		local offmnick, offmtext = text:match(u8:decode"%[.*%] %{FFFFFF%}(.*)%[%d+%]%: (.*)")
+		if offmnick ~= nil and offmtext ~= nil and col == -1144065 then
+			if offmtext:match(u8:decode"[Мм][Оо][Ии] [Оо][Тт][Мм][Ее]?[Тт]?[Кк]?[Ии]?") then
+				local temp = os.tmpname()
+				local time = os.time()
+				local found = false
+				downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
+					if (status == 58) then
+						local file = io.open(temp, "r")
+						for line in file:lines() do
+							line = encoding.UTF8:decode(line)
+							local offrank, offtm, offwm, offdate = line:match('%["' .. offmnick .. '",(%d+),%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]')
+							if tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
+								found = true
+								chatManager.addMessageToQueue("/fs " .. offmnick .. " > Сегодня: " .. u8(offtm) .. " / За неделю: " .. u8(offwm) .. " часов")
+							end
+						end
+						if not found then chatManager.addMessageToQueue("/fs Отметки " .. offmnick .. " не найдены в базе данных!") end
+						file:close()
+						os.remove(temp)
+						else
+						if (os.time() - time > 10) then
+							chatManager.addMessageToQueue("/fs Превышено время загрузки файла, повторите попытку")
+							return
+						end
+					end
+				end)
+			end
+		end
+		local passorg, passrank = text:match(u8:decode" Организация%: (.*)%s+Должность%: (.*)")
+		if passorg ~= nil and passrank ~= nil and col == -169954305 then
+			local currentPost
+			local x, y, z = getCharCoordinates(PLAYER_PED)
+			for i, v in ipairs(posts) do
+				if (x >= v[2]) and (y >= v[3]) and (x <= v[4]) and (y <= v[5]) then
+					if v[1]:match("КПП") then
+						passrank = u8(passrank)
+						if not passrank:match("Майор") and not passrank:match("[Пп]олковник") and not passrank:match("Генерал") then
+							local ranksnesokr = {["Ст.сержант"] = "Старший сержант", ["Мл.сержант"] = "Младший сержант", ["Ст.Лейтенант"] = "Старший лейтенант", ["Мл.Лейтенант"] = "Младший лейтенант"}
+							passrank = ranksnesokr[passrank] ~= nil and ranksnesokr[passrank] or passrank
+							lua_thread.create(function()
+								local A_Index = 0
+								while true do
+									if A_Index == 5 then break end
+									local str = sampGetChatString(99 - A_Index)
+									local passnick = str:match(u8:decode"Имя%: (.*)")
+									if passnick ~= nil then
+										if passnick ~= sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) then
+											local passid = sampGetPlayerIdByNickname(passnick)
+											if passid ~= nil then
+												local result, passskin = sampGetPlayerSkin(passid)
+												if result then
+													if passskin ~= 287 and passskin ~= 191 then
+														checkpoint[1] = passnick:match(".*_(.*)")
+														checkpoint[2] = passrank
+														if passorg:match("Army LV") then
+															chatManager.addMessageToQueue("/f " .. u8(tag) .. "В часть прибыл " .. passrank .. " " .. passnick:match(".*_(.*)"))
+															local passclist = clists.numbers[sampGetPlayerColor(passid)]
+															if passclist == 7 then
+																chatManager.addMessageToQueue("Товарищ " .. passrank .. " " .. passnick:match(".*_(.*)") .. ", можете двигатся далее!")
+																else
+																chatManager.addMessageToQueue("Товарищ " .. passrank .. " " .. passnick:match(".*_(.*)") .. ", наденьте повязку №7!")
+																chatManager.addMessageToQueue("/b /clist 7")
+															end
+															return
+														end
+													end
+												end
+											end
+										end
+									end
+									A_Index = A_Index + 1
+								end
+							end)
+							else
+							script.sendMessage("Доклад не будет сделан, так как паспорт показал старший офицер")
+							return
+						end
+					end
 				end
 			end
 		end
@@ -864,36 +994,42 @@ function chatManager.updateAntifloodClock() -- обновить задержку
 	end
 end
 --------------------------------------------------------------------------------------------------------------------------
-function takeVehicle()
+function cmd_vzyal()
 	local car = isCharInAnyCar(PLAYER_PED) and storeCarCharIsInNoSave(PLAYER_PED) or -1
 	local idc = car ~= -1 and getCarModel(car) or -1
 	local x, y, z = getCharCoordinates(PLAYER_PED)
-	if idc == 433 and getDriverOfCar(car) == PLAYER_PED then	
-		if x >= 266 and x <= 287 and y >= 1940 and y <= 2004 and z > 16 and z < 30 then
-			chatManager.addMessageToQueue("/f " .. tag .. " Взял" .. a .. " грузовик, литраж " .. currentFuel .. ", загружаюсь на ГС")
+	if idc == 433 then	
+		if getDriverOfCar(car) == PLAYER_PED then
+			if x >= 266 and x <= 287 and y >= 1940 and y <= 2004 and z > 16 and z < 30 then
+				chatManager.addMessageToQueue("/f " .. u8(tag) .. "Взял" .. a .. " грузовик, литраж " .. currentFuel .. ", загружаюсь на ГС")
+			end
+			else
+			script.sendMessage("Вы не водитель грузовика!")
 		end
+		else
+		script.sendMessage("Вы не в грузовике!")
 	end
 end
 
 function setclist()
 	lua_thread.create(function()
 		local res, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
-		if not res then chatmsg(u8:decode"Не удалось узнать свой ID") return end
+		if not res then script.sendMessage("Не удалось узнать свой ID") return end
 		local myclist = clists.numbers[sampGetPlayerColor(myid)]
-		if myclist == nil then chatmsg(u8:decode"Не удалось узнать номер своего цвета") return end
+		if myclist == nil then script.sendMessage("Не удалось узнать номер своего цвета") return end
 		if myclist == 0 then
-			if tonumber(lva_ini.values.clist) == 0 then chatmsg(u8:decode"На вас уже нету клиста!") return end
+			if tonumber(lva_ini.values.clist) == 0 then script.sendMessage("На вас уже нету клиста!") return end
 			chatManager.addMessageToQueue("/clist " .. lva_ini.values.clist .. "")
 			wait(1300)
 			local newmyclist = clists.numbers[sampGetPlayerColor(myid)]
-			if newmyclist == nil then chatmsg(u8:decode"Не удалось узнать номер своего цвета") return end
-			if newmyclist ~= tonumber(lva_ini.values.clist) then chatmsg(u8:decode"Клист не был надет") return end
+			if newmyclist == nil then script.sendMessage("Не удалось узнать номер своего цвета") return end
+			if newmyclist ~= tonumber(lva_ini.values.clist) then script.sendMessage("Клист не был надет") return end
 			else
 			chatManager.addMessageToQueue("/clist 0")
 			wait(1300)
 			local newmyclist = clists.numbers[sampGetPlayerColor(myid)]
-			if newmyclist == nil then chatmsg(u8:decode"Не удалось узнать номер своего цвета") return end
-			if newmyclist ~= 0 then chatmsg(u8:decode"Клист не был снят") return end
+			if newmyclist == nil then script.sendMessage("Не удалось узнать номер своего цвета") return end
+			if newmyclist ~= 0 then script.sendMessage("Клист не был снят") return end
 		end
 	end)
 end
@@ -905,25 +1041,149 @@ function hello()
 		while true do
 			if A_Index == 30 then break end
 			local str = sampGetChatString(99 - A_Index)
-			local re1 = regex.new(u8:decode" \\{8470FF\\}(.*) \\{.*\\}(.*)\\_(.*)\\[(.*)\\]\\{8470FF\\}:  (.*)((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*))")
+			local re1 = regex.new(u8:decode" \\{.*\\}(.*) \\{.*\\}(.*)\\_(.*)\\[(.*)\\]\\{.*\\}:  (.*)((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*))")
 			local re2 = regex.new(u8:decode" (.*)  (.*)\\_(.*)\\[(.*)\\]:  (.*)((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*))")
 			local zvanie, _, surname
-			zvanie, _, surname = re1:match(str)
-			if zvanie == nil then
+			
+			if lva_ini.bools.fcol then
+				zvanie, _, surname = re1:match(str)
+				else
 				zvanie, _, surname = re2:match(str)
 			end
 			
 			if zvanie ~= nil then
 				local ranksnesokr = {["Ст.сержант"] = "Старший сержант", ["Мл.сержант"] = "Младший сержант", ["Ст.Лейтенант"] = "Старший лейтенант", ["Мл.Лейтенант"] = "Младший лейтенант"}
-				local pRank = ranksnesokr[zvanie] ~= nil and ranksnesokr[zvanie] or zvanie
-				chatManager.addMessageToQueue("/f " .. tag .. " Здравия желаю, товарищ " .. pRank .. " " .. surname .. "!")
+				local pRank = ranksnesokr[u8(zvanie)] ~= nil and ranksnesokr[u8(zvanie)] or u8(zvanie)
+				chatManager.addMessageToQueue("/f " .. u8(tag) .. "Здравия желаю, товарищ " .. pRank .. " " .. surname .. "!")
 				return
 			end
 			A_Index = A_Index + 1
 		end
 		
-		chatmsg(u8:decode"Никто не здоровался в рацию!")
+		script.sendMessage("Никто не здоровался в рацию!")
 	end)
+end
+
+function cmd_zas(s)
+	if tonumber(s) == nil then script.sendMessage("Ошибка! Введите /zas [кол-во состава]") return end
+	s = tonumber(s)
+	local k = {
+		[1] = 'Один боец', 
+		[2] = 'Два бойца', 
+		[3] = 'Три бойца', 
+		[4] = 'Четыре бойца', 
+		[5] = 'Пять бойцов', 
+		[6] = 'Шесть бойцов', 
+		[7] = 'Семеро бойцов', 
+		[8] = 'Восьмеро бойцов', 
+		[9] = 'Девять бойцов', 
+		[10] = 'Десять бойцов'
+	}
+	local x, y, z = getCharCoordinates(PLAYER_PED)
+	local currentPost
+	for i, v in ipairs(posts) do
+		if (x >= v[2]) and (y >= v[3]) and (x <= v[4]) and (y <= v[5]) then
+			currentPost = v[1]
+		end
+	end
+	if currentPost == nil then script.sendMessage("Вы не на одном из постов!") return end
+	chatManager.addMessageToQueue("/f " .. u8(tag) .. "Заступил на пост: " .. currentPost .. " | Состав: " .. (k[s] ~= nil and k[s] or s))
+end
+
+function cmd_pok(s)
+	local p = {}
+	for v in string.gmatch(s, "[^%s]+") do table.insert(p, v) end
+	if tonumber(p[1]) == nil or p[2] == nil then script.sendMessage("Ошибка! Введите /pok [кол-во состава] [причина]") return end
+	p[1] = tonumber(p[1])
+	local reason = u8:decode""
+	for i, j in ipairs(p) do
+		if i >= 2 then
+			reason = reason ~= "" and reason .. u8:decode" " .. j or j
+		end
+	end
+	local k = {
+		[1] = 'Один боец', 
+		[2] = 'Два бойца', 
+		[3] = 'Три бойца', 
+		[4] = 'Четыре бойца', 
+		[5] = 'Пять бойцов', 
+		[6] = 'Шесть бойцов', 
+		[7] = 'Семеро бойцов', 
+		[8] = 'Восьмеро бойцов', 
+		[9] = 'Девять бойцов', 
+		[10] = 'Десять бойцов'
+	}
+	if lastPost == nil then script.sendMessage("Последний пост не найден!") return end
+	chatManager.addMessageToQueue("/f " .. u8(tag) .. "Покинул пост: " .. lastPost .. " | Состав: " .. (k[p[1]] ~= nil and k[p[1]] or p[1]) .. " | Причина: " .. u8(reason))
+end
+
+function cmd_prib()
+	if checkpoint[1] ~= nil and checkpoint[2] ~= nil then
+		chatManager.addMessageToQueue("/f " .. u8(tag) .. "В часть прибыл " .. checkpoint[2] .. " " .. checkpoint[1])
+		checkpoint[1] = nil
+		checkpoint[2] = nil
+		else
+		script.sendMessage("Последний игрок, показавший вам паспорт, не обнаружен!")
+	end
+end
+
+function cmd_viezd(s)
+	lua_thread.create(function()
+		if s == "" then script.sendMessage("Ошибка! Введите /viezd [число грузовиков] [пункт назначения]") return end
+		local p = {}
+		for v in string.gmatch(s, "[^%s]+") do table.insert(p, v) end
+		local k = {[1] = "одного грузовика", [2] = "двух грузовиков", [3] = "трёх грузовиков", [4] = "четырёх грузовиков", [5] = "пяти грузовиков", [6] = "шести грузовиков", [7] = "семи грузовиков"}
+		if tonumber(p[1]) == nil or k[tonumber(p[1])] == nil then script.sendMessage("Неверное число грузовиков!") return end
+		local kol = tonumber(p[1])
+		local arr = {
+			["ls"] = "Police LS", ["lspd"] = "Police LS", ["лс"] = "Police LS", ["лспд"] = "Police LS",
+			["sfpd"] = "Police SF", ["сфпд"] = "Police SF",
+			["lv"] = "Police LV", ["lvpd"] = "Police LV", ["лв"] = "Police LV", ["лвпд"] = "Police LV",
+			["fbi"] = "FBI", ["фбр"] = "FBI",
+			["sfa"] = "Army SF", ["сфа"] = "Army SF",
+			["sf"] = "г. San-Fierro", ["сф"] = "г. San-Fierro"
+		}
+		if arr[u8(p[2])] == nil then script.sendMessage("Неверно указан пункт назначения!") return end
+		chatManager.addMessageToQueue("/f " .. u8(tag) .. "Колонна в составе " .. k[kol] .. " выехала в " .. arr[u8(p[2])] .. "")
+		wait(600)
+		chatManager.addMessageToQueue("/f " .. u8(tag) .. "Сетка, открывай! Выезжает ВМО")
+	end)
+end
+
+function cmd_port()
+	local AllChars = getAllChars()
+	local Data = {}
+	local carhandle
+	if isCharInAnyCar(PLAYER_PED) then
+		carhandle = storeCarCharIsInNoSave(PLAYER_PED)
+		for _, v in ipairs(AllChars) do
+			if v ~= PLAYER_PED then
+				if isCharInAnyCar(v) then
+					local carhandle2 = storeCarCharIsInNoSave(v)
+					if carhandle==carhandle2 then
+						local result, id = sampGetPlayerIdByCharHandle(v)			
+						if result then
+							local result2, sid = sampGetPlayerSkin(id)
+							if result2 then
+								if sid == 287 or sid == 191 then
+									table.insert(Data, tostring(sampGetPlayerNickname(id):gsub('(.*_)', '')))
+									nickincar = table.concat(Data, ", ")
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		if nickincar ~= nil then 
+			chatManager.addMessageToQueue(" /f " .. u8(tag) .. "Выехали в порт LS. Напарники: " .. nickincar)
+			else
+			chatManager.addMessageToQueue(" /f " .. u8(tag) .. "Выехал в порт LS")
+		end
+		nickincar = nil 
+		else 
+		script.sendMessage("Вы не в транспорте")
+	end
 end
 
 textlabel = {}
@@ -951,8 +1211,8 @@ function textLabelOverPlayerNickname()
 	end
 end
 
-function chatmsg(t)
-	sampAddChatMessage(prefix .. t, main_color)
+function script.sendMessage(t)
+	sampAddChatMessage(prefix .. u8:decode(t), main_color)
 end
 
 function makeHotKey(numkey)
@@ -961,124 +1221,123 @@ function makeHotKey(numkey)
 		if tonumber(v) ~= 0 then table.insert(rett, tonumber(v)) end
 	end
 	return rett
-end
-
-function string.split(str, delim, plain) -- bh FYP
-	local tokens, pos, plain = {}, 1, not (plain == false) --[[ delimiter is plain text by default ]]
-	repeat
-		local npos, epos = string.find(str, delim, pos, plain)
-		table.insert(tokens, string.sub(str, pos, npos and npos - 1))
-		pos = epos and epos + 1
-	until not pos
-	return tokens
-end
-
-function imgui.Hotkey(name, numkey, width)
-	imgui.BeginChild(name, imgui.ImVec2(width, 32), true)
-	imgui.PushItemWidth(width)
-	
-	local hstr = ""
-	for _, v in ipairs(string.split(lva_ini.hotkey[numkey], ", ")) do
-		if v ~= "0" then
-			hstr = hstr == "" and tostring(vkeys.id_to_name(tonumber(v))) or "" .. hstr .. " + " .. tostring(vkeys.id_to_name(tonumber(v))) .. ""
-		end
 	end
-	hstr = (hstr == "" or hstr == "nil") and "Нет клавиши" or hstr
 	
-	imgui.Text(hstr)
-	imgui.PopItemWidth()
-	imgui.EndChild()
-	if imgui.IsItemClicked() then
-		lua_thread.create(
-			function()
-				local curkeys = ""
-				local tbool = false
-				while true do
-					wait(0)
-					if not tbool then
-						for k, v in pairs(vkeys) do
-							sv = tostring(v)
-							if isKeyDown(v) and (v == vkeys.VK_MENU or v == vkeys.VK_CONTROL or v == vkeys.VK_SHIFT or v == vkeys.VK_LMENU or v == vkeys.VK_RMENU or v == vkeys.VK_RCONTROL or v == vkeys.VK_LCONTROL or v == vkeys.VK_LSHIFT or v == vkeys.VK_RSHIFT) then
-								if v ~= vkeys.VK_MENU and v ~= vkeys.VK_CONTROL and v ~= vkeys.VK_SHIFT then
+	function string.split(str, delim, plain) -- bh FYP
+		local tokens, pos, plain = {}, 1, not (plain == false) --[[ delimiter is plain text by default ]]
+		repeat
+			local npos, epos = string.find(str, delim, pos, plain)
+			table.insert(tokens, string.sub(str, pos, npos and npos - 1))
+			pos = epos and epos + 1
+		until not pos
+		return tokens
+	end
+	
+	function imgui.Hotkey(name, numkey, width)
+		imgui.BeginChild(name, imgui.ImVec2(width, 32), true)
+		imgui.PushItemWidth(width)
+		
+		local hstr = ""
+		for _, v in ipairs(string.split(lva_ini.hotkey[numkey], ", ")) do
+			if v ~= "0" then
+				hstr = hstr == "" and tostring(vkeys.id_to_name(tonumber(v))) or "" .. hstr .. " + " .. tostring(vkeys.id_to_name(tonumber(v))) .. ""
+			end
+		end
+		hstr = (hstr == "" or hstr == "nil") and "Нет клавиши" or hstr
+		
+		imgui.Text(hstr)
+		imgui.PopItemWidth()
+		imgui.EndChild()
+		if imgui.IsItemClicked() then
+			lua_thread.create(
+				function()
+					local curkeys = ""
+					local tbool = false
+					while true do
+						wait(0)
+						if not tbool then
+							for k, v in pairs(vkeys) do
+								sv = tostring(v)
+								if isKeyDown(v) and (v == vkeys.VK_MENU or v == vkeys.VK_CONTROL or v == vkeys.VK_SHIFT or v == vkeys.VK_LMENU or v == vkeys.VK_RMENU or v == vkeys.VK_RCONTROL or v == vkeys.VK_LCONTROL or v == vkeys.VK_LSHIFT or v == vkeys.VK_RSHIFT) then
+									if v ~= vkeys.VK_MENU and v ~= vkeys.VK_CONTROL and v ~= vkeys.VK_SHIFT then
+										if not curkeys:find(sv) then
+											curkeys = tostring(curkeys):len() == 0 and sv or curkeys .. " " .. sv
+										end
+									end
+								end
+							end
+							
+							for k, v in pairs(vkeys) do
+								sv = tostring(v)
+								if isKeyDown(v) and (v ~= vkeys.VK_MENU and v ~= vkeys.VK_CONTROL and v ~= vkeys.VK_SHIFT and v ~= vkeys.VK_LMENU and v ~= vkeys.VK_RMENU and v ~= vkeys.VK_RCONTROL and v ~= vkeys.VK_LCONTROL and v ~= vkeys.VK_LSHIFT and v ~=vkeys. VK_RSHIFT) then
+									if not curkeys:find(sv) then
+										curkeys = tostring(curkeys):len() == 0 and sv or curkeys .. " " .. sv
+										tbool = true
+									end
+								end
+							end
+							else
+							tbool2 = false
+							for k, v in pairs(vkeys) do
+								sv = tostring(v)
+								if isKeyDown(v) and (v ~= vkeys.VK_MENU and v ~= vkeys.VK_CONTROL and v ~= vkeys.VK_SHIFT and v ~= vkeys.VK_LMENU and v ~= vkeys.VK_RMENU and v ~= vkeys.VK_RCONTROL and v ~= vkeys.VK_LCONTROL and v ~= vkeys.VK_LSHIFT and v ~=vkeys. VK_RSHIFT) then
+									tbool2 = true
 									if not curkeys:find(sv) then
 										curkeys = tostring(curkeys):len() == 0 and sv or curkeys .. " " .. sv
 									end
 								end
 							end
+							
+							if not tbool2 then break end
 						end
-						
-						for k, v in pairs(vkeys) do
-							sv = tostring(v)
-							if isKeyDown(v) and (v ~= vkeys.VK_MENU and v ~= vkeys.VK_CONTROL and v ~= vkeys.VK_SHIFT and v ~= vkeys.VK_LMENU and v ~= vkeys.VK_RMENU and v ~= vkeys.VK_RCONTROL and v ~= vkeys.VK_LCONTROL and v ~= vkeys.VK_LSHIFT and v ~=vkeys. VK_RSHIFT) then
-								if not curkeys:find(sv) then
-									curkeys = tostring(curkeys):len() == 0 and sv or curkeys .. " " .. sv
-									tbool = true
-								end
-							end
-						end
+					end
+					
+					local keys = ""
+					if tonumber(curkeys) == vkeys.VK_BACK then
+						lva_ini.hotkey[numkey] = "0"
 						else
-						tbool2 = false
-						for k, v in pairs(vkeys) do
-							sv = tostring(v)
-							if isKeyDown(v) and (v ~= vkeys.VK_MENU and v ~= vkeys.VK_CONTROL and v ~= vkeys.VK_SHIFT and v ~= vkeys.VK_LMENU and v ~= vkeys.VK_RMENU and v ~= vkeys.VK_RCONTROL and v ~= vkeys.VK_LCONTROL and v ~= vkeys.VK_LSHIFT and v ~=vkeys. VK_RSHIFT) then
-								tbool2 = true
-								if not curkeys:find(sv) then
-									curkeys = tostring(curkeys):len() == 0 and sv or curkeys .. " " .. sv
-								end
-							end
+						local tNames = string.split(curkeys, " ")
+						for _, v in ipairs(tNames) do
+							local val = (tonumber(v) == 162 or tonumber(v) == 163) and 17 or (tonumber(v) == 160 or tonumber(v) == 161) and 16 or (tonumber(v) == 164 or tonumber(v) == 165) and 18 or tonumber(v)
+							keys = keys == "" and val or "" .. keys .. ", " .. val .. ""
 						end
-						
-						if not tbool2 then break end
 					end
+					
+					lva_ini.hotkey[numkey] = keys
+					inicfg.save(lva_ini, settings)
 				end
-				
-				local keys = ""
-				if tonumber(curkeys) == vkeys.VK_BACK then
-					lva_ini.hotkey[numkey] = "0"
-					else
-					local tNames = string.split(curkeys, " ")
-					for _, v in ipairs(tNames) do
-						local val = (tonumber(v) == 162 or tonumber(v) == 163) and 17 or (tonumber(v) == 160 or tonumber(v) == 161) and 16 or (tonumber(v) == 164 or tonumber(v) == 165) and 18 or tonumber(v)
-						keys = keys == "" and val or "" .. keys .. ", " .. val .. ""
-					end
-				end
-				
-				lva_ini.hotkey[numkey] = keys
-				inicfg.save(lva_ini, settings)
-			end
-		)
-	end
-end
-
-function sampGetPlayerSkin(id)
-	if not id or not sampIsPlayerConnected(tonumber(id)) and not tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) then return false end -- проверяем параметр
-	local isLocalPlayer = tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) -- проверяем, является ли цель локальным игроком
-	local result, handle = sampGetCharHandleBySampPlayerId(tonumber(id)) -- получаем CharHandle по SAMP-ID
-	local result, handle = sampGetCharHandleBySampPlayerId(tonumber(id)) -- получаем CharHandle по SAMP-ID
-	if not result and not isLocalPlayer then return false end -- проверяем, валиден ли наш CharHandle
-	local skinid = getCharModel(isLocalPlayer and PLAYER_PED or handle) -- получаем скин нашего CharHandle
-	if skinid < 0 or skinid > 311 then return false end -- проверяем валидность нашего скина, сверяя ID существующих скинов SAMP
-	return true, skinid -- возвращаем статус и ID скина
-end
-
-function getAllPickups() -- https://www.blast.hk/threads/13380/page-8#post-361600
-	local pu = {}
-	pPu = sampGetPickupPoolPtr() + 16388
-	for i = 0, 4095 do
-		local id = readMemory(pPu + 4 * i, 4)
-		if id ~= -1 then
-			table.insert(pu, sampGetPickupHandleBySampId(i))
+			)
 		end
 	end
-	return pu
-end
-
-function checkUpdates() -- проверка обновлений
-	local fpath = os.tmpname()
-	if doesFileExist(fpath) then os.remove(fpath) end
-	downloadUrlToFile("https://raw.githubusercontent.com/WebbLua/LVA/main/version.json", fpath, function(_, status, _, _)
-		if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-			if doesFileExist(fpath) then
+	
+	function sampGetPlayerSkin(id)
+		if not id or not sampIsPlayerConnected(tonumber(id)) and not tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) then return false end -- проверяем параметр
+		local isLocalPlayer = tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) -- проверяем, является ли цель локальным игроком
+		local result, handle = sampGetCharHandleBySampPlayerId(tonumber(id)) -- получаем CharHandle по SAMP-ID
+		local result, handle = sampGetCharHandleBySampPlayerId(tonumber(id)) -- получаем CharHandle по SAMP-ID
+		if not result and not isLocalPlayer then return false end -- проверяем, валиден ли наш CharHandle
+		local skinid = getCharModel(isLocalPlayer and PLAYER_PED or handle) -- получаем скин нашего CharHandle
+		if skinid < 0 or skinid > 311 then return false end -- проверяем валидность нашего скина, сверяя ID существующих скинов SAMP
+		return true, skinid -- возвращаем статус и ID скина
+	end
+	
+	function getAllPickups() -- https://www.blast.hk/threads/13380/page-8#post-361600
+		local pu = {}
+		pPu = sampGetPickupPoolPtr() + 16388
+		for i = 0, 4095 do
+			local id = readMemory(pPu + 4 * i, 4)
+			if id ~= -1 then
+				table.insert(pu, sampGetPickupHandleBySampId(i))
+			end
+		end
+		return pu
+	end
+	
+	function checkUpdates() -- проверка обновлений
+		local fpath = getWorkingDirectory() .. '/LVA.dat'
+		downloadUrlToFile("https://raw.githubusercontent.com/WebbLua/LVA/main/version.json", fpath, function(_, status, _, _)
+			if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+				if doesFileExist(fpath) then
 				local file = io.open(fpath, 'r')
 				if file then
 					local info = decodeJson(file:read('*a'))
@@ -1092,19 +1351,19 @@ function checkUpdates() -- проверка обновлений
 						if script.access[currentNick] ~= nil then
 							if not script.access[currentNick] then
 								os.remove("Moonloader\\LVA.lua")
-								chatmsg(u8:decode"Вы в blacklist'e, скрипт удалён")
+								script.sendMessage("Вы в blacklist'e, скрипт удалён")
 								script.noaccess = true
 								thisScript():unload()
 								return
 							end
 							else
-							chatmsg(u8:decode"Нет доступа")
+							script.sendMessage("Нет доступа")
 							script.noaccess = true
 							thisScript():unload()
 							return
 						end
 						else
-						chatmsg(u8:decode"Произошла ошибка, попробуйте позже")
+						script.sendMessage("Произошла ошибка, попробуйте позже")
 						thisScript():unload()
 						return
 					end
@@ -1120,29 +1379,29 @@ function checkUpdates() -- проверка обновлений
 					if info['version_num'] > thisScript()['version_num'] then
 						script.available = true
 						if script.update then updateScript() return end
-						chatmsg(updatingprefix .. u8:decode"Обнаружена новая версия скрипта от " .. info['version_date'] .. u8:decode", пропишите /armyup для обновления")
-						chatmsg(updatingprefix .. u8:decode"Изменения в новой версии:")
+						script.sendMessage(updatingprefix .. "Обнаружена новая версия скрипта от " .. info['version_date'] .. ", пропишите /armyup для обновления")
+						script.sendMessage(updatingprefix .. "Изменения в новой версии:")
 						if script.upd.sort ~= {} then
 							for k in ipairs(script.upd.sort) do
 								if script.upd.changes[tostring(k)] ~= nil then
-									chatmsg(updatingprefix .. k .. ') ' .. u8:decode(script.upd.changes[tostring(k)]))
+									script.sendMessage(updatingprefix .. k .. ') ' .. script.upd.changes[tostring(k)])
 								end
 							end
 						end
 						return true
 						else
-						if script.update then chatmsg(u8:decode"Обновлений не обнаружено, вы используете самую актуальную версию: v" .. script.v.num .. u8:decode" за " .. script.v.date) script.update = false return end
+						if script.update then script.sendMessage("Обновлений не обнаружено, вы используете самую актуальную версию: v" .. script.v.num .. " за " .. script.v.date) script.update = false return end
 					end
 					else
-					chatmsg(u8:decode"Не удалось получить информацию про обновления(")
+					script.sendMessage("Не удалось получить информацию про обновления(")
 					thisScript():unload()
 				end
 				else
-				chatmsg(u8:decode"Не удалось получить информацию про обновления(")
+				script.sendMessage("Не удалось получить информацию про обновления(")
 				thisScript():unload()
 			end
 		end
-	end)
+		end)
 end
 
 function updateScript()
@@ -1150,7 +1409,7 @@ function updateScript()
 	if script.available then
 		downloadUrlToFile(script.url, thisScript().path, function(_, status, _, _)
 			if status == 6 then
-				chatmsg(updatingprefix .. u8:decode"Скрипт был обновлён!")
+				script.sendMessage(updatingprefix .. "Скрипт был обновлён!")
 				if script.find("ML-AutoReboot") == nil then
 					thisScript():reload()
 				end
@@ -1174,20 +1433,22 @@ function onScriptTerminate(s, bool)
 			if not script.reload then
 				if not script.update then
 					if not script.unload then
-						chatmsg(u8:decode"Скрипт крашнулся: отправьте moonloader.log разработчику tg: @Imykhailovich")
+						script.sendMessage("Скрипт крашнулся: отправьте moonloader.log разработчику tg: @Imykhailovich")
 						else
-						chatmsg(u8:decode"Скрипт был выгружен")
+						script.sendMessage("Скрипт был выгружен")
 					end
 					else
-					chatmsg(updatingprefix .. u8:decode"Старый скрипт был выгружен, загружаю обновлённую версию...")
+					script.sendMessage(updatingprefix .. "Старый скрипт был выгружен, загружаю обновлённую версию...")
 				end
 				else
-				chatmsg(u8:decode"Перезагружаюсь...")
+				script.sendMessage("Перезагружаюсь...")
 			end
 			else
 			return
 		end
 	end			
 end
+
+
 
 
