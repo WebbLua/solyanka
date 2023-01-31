@@ -1,7 +1,7 @@
 script_name('Las-Venturas Army')
 script_author("Cody_Webb | Telegram: @Imykhailovich")
-script_version("31.01.2023")
-script_version_number(4)
+script_version("28.01.2023")
+script_version_number(3)
 local script = {checked = false, available = false, update = false, noaccess = false, v = {date, num}, url, access = {}, reload, loaded, unload, upd = {changes = {}, sort = {}}, label = {}}
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
@@ -1176,9 +1176,9 @@ function cmd_port()
 			end
 		end
 		if nickincar ~= nil then 
-			chatManager.addMessageToQueue(" /f " .. u8(tag) .. "Выехали в порт LS. Напарники: " .. nickincar)
+			chatManager.addMessageToQueue("/f " .. u8(tag) .. "Выехали в порт LS. Напарники: " .. nickincar)
 			else
-			chatManager.addMessageToQueue(" /f " .. u8(tag) .. "Выехал в порт LS")
+			chatManager.addMessageToQueue("/f " .. u8(tag) .. "Выехал в порт LS")
 		end
 		nickincar = nil 
 		else 
