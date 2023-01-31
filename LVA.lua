@@ -1,7 +1,7 @@
 script_name('Las-Venturas Army')
 script_author("Cody_Webb | Telegram: @Imykhailovich")
-script_version("31.01.2023")
-script_version_number(4)
+script_version("28.01.2023")
+script_version_number(3)
 local script = {checked = false, available = false, update = false, noaccess = false, v = {date, num}, url, access = {}, reload, loaded, unload, upd = {changes = {}, sort = {}}, label = {}}
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
@@ -41,7 +41,7 @@ local config = {
 -------------------------------------------------------------------------[Переменные и маcсивы]-----------------------------------------------------------------
 local main_color = 0xFF59A655
 local prefix = "{59A655}[Army LV] {FFFAFA}"
-local updatingprefix = u8:decode"{FF0000}[ОБНОВЛЕНИЕ] {FFFAFA}"
+local updatingprefix = "{FF0000}[ОБНОВЛЕНИЕ] {FFFAFA}"
 local antiflood = 0
 local needtoreload = false
 local needtocl7 = true
@@ -1333,7 +1333,7 @@ function makeHotKey(numkey)
 		return pu
 	end
 	
-	function checkUpdates() -- проверка обновлений
+function checkUpdates() -- проверка обновлений
 		local fpath = getWorkingDirectory() .. '/LVA.dat'
 		downloadUrlToFile("https://raw.githubusercontent.com/WebbLua/LVA/main/version.json", fpath, function(_, status, _, _)
 			if status == dlstatus.STATUSEX_ENDDOWNLOAD then
