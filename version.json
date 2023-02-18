@@ -1,6 +1,6 @@
 {
-  "version_num": 6,
-  "version_date": "06.02.2023",
+  "version_num": 7,
+  "version_date": "18.02.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
       "Lavrentiy_Beria": true,
@@ -14,9 +14,7 @@
              "vodka": {"color": "0xFFB30000", "text": "Основатель скрипта"}
   },
    "version_upd": {
-             "1": "Реализован помощник для поставок",
-             "2": "Добавлена команда /mon",
-             "3": "Добавлена команда /razg",
-             "4": "Добавлена команда /vern"
+             "1": "Добавлена автоотправка мониторинга в рацию при запросе",
+             "2": "Пофикшена одна кнопка в главном меню"
   }       
 }
