@@ -1,7 +1,7 @@
 script_name('Las-Venturas Army')
 script_author("Lavrentiy_Beria | Telegram: @Imykhailovich")
-script_version("06.02.2023")
-script_version_number(6)
+script_version("18.02.2023")
+script_version_number(7)
 local script = {checked = false, available = false, update = false, noaccess = false, v = {date, num}, url, access = {}, reload, loaded, unload, upd = {changes = {}, sort = {}}, label = {}}
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
@@ -99,7 +99,8 @@ local waffenlieferungen = {
 	[6] = false, -- отправка в сквад, заместь рации
 	[7] = 0, -- время разгрузки в UNIX
 	[8] = nil, -- последний склад разгрузки
-	[9] = 0 -- кол-во разгруж. матов
+	[9] = 0, -- кол-во разгруж. матов
+	[10] = false -- запрос моника из рации
 }
 
 local clists = {
@@ -756,8 +757,8 @@ function imgui.OnDrawFrame()
 			end
 		end
 		if not found then
-			if imgui.Button("Cody Webb сейчас не в сети", imgui.ImVec2(260.0, 30.0)) then
-				script.sendMessage("Cody Webb играет на Revolution (сейчас не онлайн)")
+			if imgui.Button("Lavrentiy Beria сейчас не в сети", imgui.ImVec2(260.0, 30.0)) then
+				script.sendMessage("Lavrentiy Beria играет на Revolution (сейчас не онлайн)")
 			end
 		end
 		
@@ -805,6 +806,11 @@ function ev.onServerMessage(col, text)
 		if lva_ini.bools.fcol then -- окраска ников в чате фракции
 			local frank, fnick, fid, ftxt = text:match(u8:decode"^ (.*)  (.*)%[(%d+)%]%: (.*)")
 			if fid ~= nil and col == -1920073729 then
+				if ftxt:match(u8:decode"[МмMm][ОоOo][НнNn][ИиIi][ТтTtКкKk][ОоOo]?[РрRr]?") then
+					waffenlieferungen[10] = true
+					cmd_mon()
+				end
+				
 				local color = "{" .. bit.tohex(bit.rshift(col, 8), 6) .. "}"
 				local clist = "{" .. ("%06x"):format(bit.band(sampGetPlayerColor(fid), 0xFFFFFF)) .. "}"
 				text = " " .. color .. frank .. " " .. clist .. fnick .. "[" .. fid .. "]" .. color .. ": " .. ftxt .. ""
@@ -936,6 +942,7 @@ function ev.onServerMessage(col, text)
 				end
 				waffenlieferungen[3] = false
 				waffenlieferungen[6] = false
+				waffenlieferungen[10] = false
 				return false
 			end
 		end
@@ -1458,9 +1465,9 @@ function cmd_port()
 end
 
 function cmd_mon()
-	if not isCharInAnyCar(PLAYER_PED) then if not waffenlieferungen[6] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false chatManager.addMessageToQueue("/fs Я бы отправил, но я не в грузовике(") end return end
+	if not isCharInAnyCar(PLAYER_PED) then if not waffenlieferungen[6] or not waffenlieferungen[10] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false waffenlieferungen[10] = false end return end
 	local idc = getCarModel(storeCarCharIsInNoSave(PLAYER_PED))
-	if idc ~= 433 then if not waffenlieferungen[6] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false chatManager.addMessageToQueue("/fs Я бы отправил, но я не в грузовике(") end return end
+	if idc ~= 433 then if not waffenlieferungen[6] or not waffenlieferungen[10] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false waffenlieferungen[10] = false end return end
 	
 	waffenlieferungen[3] = true
 	waffenlieferungen[5][1] = true
@@ -1733,6 +1740,7 @@ function onScriptTerminate(s, bool)
 		end
 	end			
 end
+
 
 
 
