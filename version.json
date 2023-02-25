@@ -5,14 +5,15 @@
   "version_access": {
       "Lavrentiy_Beria": true,
       "Test_Script": true,
-      "Andrey_Pestov": true
+      "Andrey_Pestov": true,
+      "Kir_Metov": true,
+      "James_Webb": true
   },
   "version_label": {
              "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
              "Lavrentiy_Beria": {"color": "0xFFB30000", "text": "Основатель скрипта"},
              "Sebastian_Melgaard": {"color": "0xFFB30000", "text": "Основатель скрипта"},
              "vodka": {"color": "0xFFB30000", "text": "Основатель скрипта"},
-             "Kir_Metov": {"color": "0xFFB30000", "text": "Основатель скрипта"},
              "James_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"}
   },
    "version_upd": {
