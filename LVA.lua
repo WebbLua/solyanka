@@ -33,7 +33,9 @@ local config = {
 		clist = '0',
 		ration = '0',
 		zdrav = '0',
-		sos = '0'
+		sos = '0',
+		tazer = '0',
+		accept = '0'
 	},
 	values = {
 		tag = "",
@@ -289,7 +291,6 @@ function main()
 	while sampGetGamestate() ~= 3 do wait(0) end
 	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
 	checkUpdates()
-	script.sendMessage("Скрипт запущен. Открыть главное меню - /lva")
 	imgui.Process = true
 	needtoreload = true
 	
@@ -304,6 +305,8 @@ function main()
 			rkeys.registerHotKey(makeHotKey('ration'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSetChatInputEnabled(true) sampSetChatInputText("/f " .. tag) end)
 			rkeys.registerHotKey(makeHotKey('zdrav'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end hello() end)
 			rkeys.registerHotKey(makeHotKey('sos'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sos() end)
+			rkeys.registerHotKey(makeHotKey('tazer'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSendChat("/tazer") end)
+			rkeys.registerHotKey(makeHotKey('accept'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end accept() end)
 			suspendkeys = 0
 		end
 		
@@ -613,6 +616,12 @@ function imgui.OnDrawFrame()
 			imgui.Hotkey("hotkey3", "sos", 100) 
 			imgui.SameLine() 
 			imgui.Text("Отправить сигнал SOS в рацию\n(Если будете находится возле военного объекта, то напишет объект)") 
+			imgui.Hotkey("hotkey4", "tazer", 100) 
+			imgui.SameLine()
+			imgui.Text("Переключить режим тазера\n(Для копов)") 
+			imgui.Hotkey("hotkey5", "accept", 100) 
+			imgui.SameLine() 
+			imgui.Text("/f Принято\n(хуета)") 
 			imgui.PopItemWidth()
 			imgui.PopFont()
 			
@@ -810,7 +819,6 @@ function ev.onServerMessage(col, text)
 					waffenlieferungen[10] = true
 					cmd_mon()
 				end
-				
 				local color = "{" .. bit.tohex(bit.rshift(col, 8), 6) .. "}"
 				local clist = "{" .. ("%06x"):format(bit.band(sampGetPlayerColor(fid), 0xFFFFFF)) .. "}"
 				text = " " .. color .. frank .. " " .. clist .. fnick .. "[" .. fid .. "]" .. color .. ": " .. ftxt .. ""
@@ -819,7 +827,7 @@ function ev.onServerMessage(col, text)
 		end
 		local sqnick, sqtext = text:match(u8:decode"%[.*%] %{FFFFFF%}(.*)%[%d+%]%: (.*)")
 		if sqnick ~= nil and sqtext ~= nil and col == -1144065 then
-			if sqtext:match(u8:decode"[Мм][Оо][Ии] [Оо][Тт][Мм][Ее]?[Тт]?[Кк]?[Ии]?") then
+			if sqtext:match(u8:decode"[Оо][Тт][Мм][Ее]?[Тт]?[Кк]?[Ии]?") then
 				local temp = os.tmpname()
 				local time = os.time()
 				local found = false
@@ -834,7 +842,7 @@ function ev.onServerMessage(col, text)
 								chatManager.addMessageToQueue("/fs " .. sqnick .. " > Сегодня: " .. u8(offtm) .. " / За неделю: " .. u8(offwm) .. " часов")
 							end
 						end
-						if not found then chatManager.addMessageToQueue("/fs Отметки " .. sqnick .. " не найдены в базе данных!") end
+						if not found then script.sendMessage("Отметки " .. sqnick .. " не найдены в базе данных!") return end
 						file:close()
 						os.remove(temp)
 						else
@@ -925,6 +933,11 @@ function ev.onServerMessage(col, text)
 			waffenlieferungen[7] = os.time()
 			waffenlieferungen[8] = u8(s)
 			waffenlieferungen[9] = math.floor(tonumber(sk)/1000)
+			local res, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
+			local myclist = clists.numbers[sampGetPlayerColor(myid)]
+			if myclist == 0 then
+				if tonumber(lva_ini.values.clist) ~= 0 then chatManager.addMessageToQueue("/clist " .. lva_ini.values.clist .. "") end
+			end
 		end
 		local m = text:match(u8:decode"Материалов: (%d+)/10000")
 		if m ~= nil then waffenlieferungen[2] = tonumber(m) wasInTruck = true return end
@@ -1017,8 +1030,8 @@ function ev.onShowDialog(dialogid, style, title, button1, button2, text)
 							end
 						end
 					end
-					return false
 				end
+				return false
 			end
 		end
 		if lva_ini.bools.elevator then
@@ -1331,7 +1344,41 @@ function sos()
 	end
 	
 	local kv = kvadrat()
-	if kv ~= nil then chatManager.addMessageToQueue("/" .. (needtocl7 and "u" or "f") .. " " .. u8(tag) .. "SОS " .. kv .. "") end
+	if kv ~= nil then chatManager.addMessageToQueue("/" .. "f" .. " " .. u8(tag) .. "SОS " .. kv .. "") end
+end
+
+function accept()
+	local AllChars = getAllChars()
+	local Data = {}
+	local carhandle
+	if isCharInAnyCar(PLAYER_PED) then
+		carhandle = storeCarCharIsInNoSave(PLAYER_PED)
+		for _, v in ipairs(AllChars) do
+			if v ~= PLAYER_PED then
+				if isCharInAnyCar(v) then
+					local carhandle2 = storeCarCharIsInNoSave(v)
+					if carhandle==carhandle2 then
+						local result, id = sampGetPlayerIdByCharHandle(v)			
+						if result then
+							local result2, sid = sampGetPlayerSkin(id)
+							if result2 then
+								table.insert(Data, tostring(sampGetPlayerNickname(id):gsub('(.*_)', '')))
+								nickincar = table.concat(Data, ", ")
+							end
+						end
+					end
+				end
+			end
+		end
+		if nickincar ~= nil then 
+			f("Принято. Напарники: " .. nickincar)
+			else
+			f("Принято")
+		end
+		nickincar = nil
+		return
+	end
+	f("Принято")
 end
 
 function cmd_zas(s)
@@ -1465,9 +1512,9 @@ function cmd_port()
 end
 
 function cmd_mon()
-	if not isCharInAnyCar(PLAYER_PED) then if not waffenlieferungen[6] or not waffenlieferungen[10] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false waffenlieferungen[10] = false end return end
+	if not isCharInAnyCar(PLAYER_PED) then if not waffenlieferungen[6] and not waffenlieferungen[10] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false waffenlieferungen[10] = false end return end
 	local idc = getCarModel(storeCarCharIsInNoSave(PLAYER_PED))
-	if idc ~= 433 then if not waffenlieferungen[6] or not waffenlieferungen[10] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false waffenlieferungen[10] = false end return end
+	if idc ~= 433 then if not waffenlieferungen[6] and not waffenlieferungen[10] then script.sendMessage("Необходимо быть в грузовике") else waffenlieferungen[6] = false waffenlieferungen[10] = false end return end
 	
 	waffenlieferungen[3] = true
 	waffenlieferungen[5][1] = true
@@ -1667,6 +1714,7 @@ function checkUpdates() -- проверка обновлений
 						end
 						table.sort(script.upd.sort, function(a, b) return a > b end)
 					end
+					script.sendMessage("Скрипт запущен. Открыть главное меню - /lva")
 					script.checked = true
 					if info['version_num'] > thisScript()['version_num'] then
 						script.available = true
@@ -1740,6 +1788,7 @@ function onScriptTerminate(s, bool)
 		end
 	end			
 end
+
 
 
 
