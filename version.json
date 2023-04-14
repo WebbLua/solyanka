@@ -6,7 +6,7 @@
       "Lavrentiy_Beria": true
   },
   "version_label": {
-             "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"},
+             "Cody_Webb": {"color": "0xFFB30000", "text": "Основатель скрипта"}
   },
    "version_upd": {
              "1": "Добавлено автонадевание клиста при разгрузке",
