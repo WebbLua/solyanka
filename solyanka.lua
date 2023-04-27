@@ -1,7 +1,7 @@
 script_name('Solyanka')
 script_author("Cody_Webb | Telegram: @Imykhailovich")
-script_version("07.04.2023")
-script_version_number(8)
+script_version("27.04.2023")
+script_version_number(9)
 local script = {checked = false, available = false, update = false, noaccess = false, v = {date, num}, url, access = {}, reload, loaded, unload, upd = {changes = {}, sort = {}}, label = {}}
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
@@ -44,8 +44,8 @@ local config = {
 	}
 }
 -------------------------------------------------------------------------[Переменные и маcсивы]-----------------------------------------------------------------
-local main_color = 0xFFBF0000
-local prefix = "{BF0000}[solyanka] {FFFAFA}"
+local main_color = 0xFF006400
+local prefix = "{006400}[solyanka] {FFFAFA}"
 local updatingprefix = "{FF0000}[ОБНОВЛЕНИЕ] {FFFAFA}"
 local antiflood = 0
 local needtoreload = false
@@ -311,15 +311,17 @@ function main()
 	sampRegisterChatCommand("obor", cmd_obor)
 	
 	script.loaded = true
+	
 	while sampGetGamestate() ~= 3 do wait(0) end
 	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
 	checkUpdates()
 	imgui.Process = true
 	needtoreload = true
-	
+	script.sendMessage("Скрипт успешно загружен.")
 	chatManager.initQueue()
 	lua_thread.create(chatManager.checkMessagesQueueThread)
 	lua_thread.create(function() f_matovoz() end)
+	script.sendMessage("Начинаю проверку обновлений и доступа...")
 	getoffmembers()
 	while true do
 		wait(0)
@@ -1875,7 +1877,7 @@ end
 
 function checkUpdates() -- проверка обновлений
 	local fpath = getWorkingDirectory() .. '/solyanka.dat'
-	downloadUrlToFile("https://raw.githubusercontent.com/WebbLua/LVA/main/version.json", fpath, function(_, status, _, _)
+	downloadUrlToFile("https://raw.githubusercontent.com/WebbLua/solyanka/main/version.json", fpath, function(_, status, _, _)
 		if status == dlstatus.STATUSEX_ENDDOWNLOAD then
 			if doesFileExist(fpath) then
 				local file = io.open(fpath, 'r')
@@ -1989,16 +1991,3 @@ function onScriptTerminate(s, bool)
 		end
 	end			
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
