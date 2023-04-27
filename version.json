@@ -3,14 +3,15 @@
   "version_date": "07.04.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/LVA/main/LVA.lua",
   "version_access": {
-      "Lavrentiy_Beria": true,
-      "Cody_Webb": true
+      "Cody_Webb": true,
+      "Lee_Antonio": true
   },
   "version_label": {
              "Andrey_Pestov": {"color": "0xFFB30000", "text": "Хуйлуша"}
+             "Cody_Webb": {"color": "0xFFB30000", "text": "Отец"}
   },
    "version_upd": {
-             "1": "Добавлено автонадевание клиста при разгрузке",
-             "2": "Пофикшена проверка доступа"
+             "1": "Скрипт переименован",
+             "2": "Переделаны некоторые функции, но они всё равно не работают)"
   }       
 }
