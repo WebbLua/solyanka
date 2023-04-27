@@ -311,17 +311,19 @@ function main()
 	sampRegisterChatCommand("obor", cmd_obor)
 	
 	script.loaded = true
+	script.sendMessage("Скрипт успешно загружен.")
 	
 	while sampGetGamestate() ~= 3 do wait(0) end
 	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
+	
+	script.sendMessage("Начинаю проверку обновлений и доступа...")
 	checkUpdates()
+	
 	imgui.Process = true
 	needtoreload = true
-	script.sendMessage("Скрипт успешно загружен.")
 	chatManager.initQueue()
 	lua_thread.create(chatManager.checkMessagesQueueThread)
 	lua_thread.create(function() f_matovoz() end)
-	script.sendMessage("Начинаю проверку обновлений и доступа...")
 	getoffmembers()
 	while true do
 		wait(0)
