@@ -246,6 +246,8 @@ function main()
 	if not isSampLoaded() or not isSampfuncsLoaded() then return end
 	while not isSampAvailable() do wait(0) end
 	
+	script.sendMessage("Скрипт успешно загружен.")
+	
 	while sampGetCurrentServerName() == "SA-MP" do wait(0) end
 	server = sampGetCurrentServerName():gsub('|', '')
 	server = (server:find('02') and 'Two' or (server:find('Revo') and 'Revolution' or (server:find('Legacy') and 'Legacy' or (server:find('Classic') and 'Classic' or nil))))
@@ -311,7 +313,6 @@ function main()
 	sampRegisterChatCommand("obor", cmd_obor)
 	
 	script.loaded = true
-	script.sendMessage("Скрипт успешно загружен.")
 	
 	while sampGetGamestate() ~= 3 do wait(0) end
 	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
