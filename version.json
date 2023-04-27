@@ -1,6 +1,6 @@
 {
-  "version_num": 8,
-  "version_date": "07.04.2023",
+  "version_num": 9,
+  "version_date": "27.04.2023",
   "version_url": "https://raw.githubusercontent.com/WebbLua/solyanka/main/solyanka.lua",
   "version_access": {
       "Cody_Webb": true,
@@ -12,6 +12,7 @@
   },
    "version_upd": {
              "1": "Скрипт переименован",
-             "2": "Переделаны некоторые функции, но они всё равно не работают)"
+             "2": "Переделаны некоторые функции, но они всё равно не работают)",
+             "3": "Привет Ли Гандонио"
   }       
 }
