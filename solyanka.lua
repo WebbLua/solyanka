@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
-script_version("27.04.2023")
-script_version_number(9)
+script_version("04.05.2023")
+script_version_number(10)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
