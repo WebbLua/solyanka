@@ -1199,7 +1199,7 @@ function checkaccess(nick)
 			local info = decodeJson(json)
 			if info ~= nil then
 				script.sendMessage(nick .. " - успешная авторизация.")
-				script.v.num = info.version
+				script.v.num = info.
 				script.v.date = info.date
 				script.url = info.url
 				script.upd.changes = info.upd
@@ -1211,7 +1211,7 @@ function checkaccess(nick)
 				end
 				script.checked = true
 				if info.version > thisScript()['version_num'] then
-					script.sendMessage(updatingprefix .. "Обнаружена новая версия скрипта от " .. info['version_date'] .. ", обновление начинается прямо сейчас")
+					script.sendMessage(updatingprefix .. "Обнаружена новая версия скрипта от " .. info.version .. ", обновление начинается прямо сейчас")
 					script.sendMessage(updatingprefix .. "Изменения в новой версии:")
 					if script.upd.sort ~= {} then
 						for k in ipairs(script.upd.sort) do
