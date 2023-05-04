@@ -1211,7 +1211,7 @@ function checkaccess(nick)
 				end
 				script.checked = true
 				if info.version > thisScript()['version_num'] then
-					script.sendMessage(updatingprefix .. "Обнаружена новая версия скрипта от " .. info.version .. ", обновление начинается прямо сейчас")
+					script.sendMessage(updatingprefix .. "Обнаружена новая версия скрипта от " .. info.date .. ", обновление начинается прямо сейчас")
 					script.sendMessage(updatingprefix .. "Изменения в новой версии:")
 					if script.upd.sort ~= {} then
 						for k in ipairs(script.upd.sort) do
