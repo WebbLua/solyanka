@@ -1199,7 +1199,7 @@ function checkaccess(nick)
 			local info = decodeJson(json)
 			if info ~= nil then
 				script.sendMessage(nick .. " - успешная авторизация.")
-				script.v.num = info.
+				script.v.num = info.version
 				script.v.date = info.date
 				script.url = info.url
 				script.upd.changes = info.upd
