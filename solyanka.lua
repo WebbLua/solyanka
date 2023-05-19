@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
 script_version("19.05.2023")
-script_version_number(12)
+script_version_number(13)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
@@ -1198,7 +1198,6 @@ function checkaccess(p)
 				script.v.date = info.date
 				script.url = info.url
 				script.upd.changes = info.upd
-				script.checked = true
 				if info.version > thisScript()['version_num'] then
 					script.sendMessage(updatingprefix .. "Обнаружена новая версия скрипта от " .. info.date .. ", обновление начинается прямо сейчас")
 					script.sendMessage(updatingprefix .. "Изменения в новой версии:")
@@ -1208,6 +1207,7 @@ function checkaccess(p)
 					updateScript()
 					return
 				end
+				script.checked = true
 				else
 				script.sendMessage("Произошла ошибка при декодировании json")
 				script.unload = true
@@ -1327,4 +1327,4 @@ function onScriptTerminate(s, bool)
 			return
 		end
 	end			
-end	
+end
