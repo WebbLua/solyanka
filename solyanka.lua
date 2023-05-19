@@ -1043,7 +1043,7 @@ function cmd_cam(action)
 end
 
 function script.sendMessage(t)
-	sampAddChatMessage(prefix .. u8:decode(t), main_color)
+	sampAddChatMessage(u8:decode(prefix .. t), main_color)
 end
 
 function makeHotKey(numkey)
