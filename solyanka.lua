@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
 script_version("19.05.2023")
-script_version_number(13)
+script_version_number(14)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
@@ -19,7 +19,8 @@ local script = { -- технические переменные скрипта
 	upd = { -- масив информации про обновления
 		changes = {}, 
 		sort = {}
-	}
+	},
+	offmembers = {}
 }
 local cmds = { -- команды скрипта
 	"/changepassword [old] [new] - изменить пользовательский пароль",
@@ -102,7 +103,6 @@ local suspendkeys = 2 -- 0 хоткеи включены, 1 -- хоткеи вы
 local ImVec4 = imgui.ImVec4
 local imfonts = {mainFont = nil, smallmainFont = nil, memfont = nil}
 local targetId, targetNick, targetRank, playerNick, playerRank
-local offmembers = {}
 local tag = ""
 local a = ""
 local currentNick
@@ -227,7 +227,7 @@ function main()
 		needtoreload = true
 		chatManager.initQueue()
 		lua_thread.create(chatManager.checkMessagesQueueThread)
-		getoffmembers()
+		--getoffmembers()
 		
 		script.loaded = true
 		script.sendMessage("Скрипт by " .. unpack(thisScript().authors) .. " запущен. Открыть главное меню - /solyanka")
@@ -271,7 +271,7 @@ function main()
 						if result2 then
 							if sid ~= 287 and sid ~= 191 then
 								chatManager.addMessageToQueue("/clist 7") 
-								chatManager.addMessageToQueue("/me надел " .. belka_ini.UserClist[7])
+								chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[7]))
 							end
 						end
 					end
@@ -675,36 +675,36 @@ function imgui.OnDrawFrame()
 	
 end
 -------------------------------------------------------------------------[ФУНКЦИИ]-----------------------------------------------------------------------------------------
-function getoffmembers()
-	local temp = os.tmpname()
-	local time = os.time()
-	local found = false
-	downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
-		if (status == 58) then
-			local file = io.open(temp, "r")
-			if file ~= nil then
-				local filetext = file:read("*a")
-				text = encoding.UTF8:decode(filetext)
-				local members = text:match(u8:decode"data%: (.*)columns%: %["):match("%[(.*)%]%,")
-				for offnick, offrank, offtm, offwm, offdate in string.gmatch(members, '%[%"(%a+%_%a+)%"%,(%d+)%,%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]') do
-					if offnick ~= nil and tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
-						offrank = tonumber(offrank)
-						offtm = tonumber(offtm)
-						offwm = tonumber(offwm)
-						offmembers[offnick] = {rank = offrank, zv = zv[offrank], zvskl = zvskl[offrank], tm = offtm, wm = offwm, date = offdate}
-					end
-				end
-				file:close()
-				os.remove(temp)
-				else
-				if (os.time() - time > 10) then
-					script.sendMessage("Превышено время загрузки файла, повторите попытку")
-					return
-				end
-			end
-		end
-	end)
-end
+-- function getoffmembers()
+-- local temp = os.tmpname()
+-- local time = os.time()
+-- local found = false
+-- downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
+-- if (status == 58) then
+-- local file = io.open(temp, "r")
+-- if file ~= nil then
+-- local filetext = file:read("*a")
+-- text = encoding.UTF8:decode(filetext)
+-- local members = text:match(u8:decode"data%: (.*)columns%: %["):match("%[(.*)%]%,")
+-- for offnick, offrank, offtm, offwm, offdate in string.gmatch(members, '%[%"(%a+%_%a+)%"%,(%d+)%,%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]') do
+-- if offnick ~= nil and tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
+-- offrank = tonumber(offrank)
+-- offtm = tonumber(offtm)
+-- offwm = tonumber(offwm)
+-- offmembers[offnick] = {rank = offrank, zv = zv[offrank], zvskl = zvskl[offrank], tm = offtm, wm = offwm, date = offdate}
+-- end
+-- end
+-- file:close()
+-- os.remove(temp)
+-- else
+-- if (os.time() - time > 10) then
+-- script.sendMessage("Превышено время загрузки файла, повторите попытку")
+-- return
+-- end
+-- end
+-- end
+-- end)
+-- end
 
 function ev.onServerMessage(col, text)
 	if script.loaded then
@@ -713,12 +713,12 @@ function ev.onServerMessage(col, text)
 		if solyanka_ini.bools.autocl and col == 1790050303 then
 			if text:match(u8:decode"^ Рабочий день окончен") then
 				chatManager.addMessageToQueue("/clist 7")
-				chatManager.addMessageToQueue("/me надел " .. belka_ini.UserClist[7])
+				chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[7]))
 				elseif text:match(u8:decode"^ Рабочий день начат") then
 				local cl = tonumber(solyanka_ini.values.clist)
 				if cl ~= nil then
 					chatManager.addMessageToQueue("/clist " .. tostring(cl))
-					chatManager.addMessageToQueue("/me надел " .. belka_ini.UserClist[cl])
+					chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[cl]))
 				end
 			end
 		end
@@ -727,7 +727,7 @@ function ev.onServerMessage(col, text)
 			if smstxt ~= nil and smsnick ~= nil and smsid ~= nil then
 				local checkid = sampGetPlayerIdByNickname(smsnick)
 				if checkid == tonumber(smsid) and sampIsPlayerConnected(checkid) then
-					chatManager.addMessageToQueue("/seedo Поступило сообщение " .. (offmembers[smsnick] ~= nil and "от " .. offmembers[smsnick].zvskl or "на телефон") .. "")
+					chatManager.addMessageToQueue("/seedo Поступило сообщение " .. (script.offmembers[smsnick] ~= nil and "от " .. zvskl[script.offmembers[smsnick].rank] or "на телефон") .. "")
 				end
 			end
 		end
@@ -901,7 +901,7 @@ function ev.onSendDeathNotification(reason, id)
 				lua_thread.create(function()
 					repeat wait(0) until getActiveInterior() ~= 0
 					chatManager.addMessageToQueue("/clist " .. cl)
-					chatManager.addMessageToQueue("/me надел " .. belka_ini.UserClist[cl])
+					chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[cl]))
 				end)
 			end
 		end
@@ -980,7 +980,7 @@ function chatManager.checkMessagesQueueThread() -- проверить поток
 					
 					if sendMessage then
 						chatManager.lastMessage = message.message
-						sampSendChat(message.message)
+						sampSendChat(u8:decode(message.message))
 					end
 					
 					message.message = ""
@@ -1201,6 +1201,10 @@ function checkaccess(p)
 					updateScript()
 					return
 				end
+				script.offmembers = info.offmembers
+				local zv = zv[script.offmembers[currentNick].rank]
+				local otm = script.offmembers[currentNick].week
+				if zv ~= nil and otm ~= nil then script.sendMessage("Товарищ " .. zv .. " " .. currentNick:match(".*%_(.*)") .. ", у вас {B30000}" .. otm .. "{FFFAFA} отметок") end
 				script.checked = true
 				solyanka_ini.values.password = p
 				inicfg.save(solyanka_ini, settings)
