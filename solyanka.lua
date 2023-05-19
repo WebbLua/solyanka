@@ -223,25 +223,6 @@ function main()
 			tag = imgui.ImBuffer(solyanka_ini.values.tag, 256)
 		}
 		
-		sampRegisterChatCommand("solyanka", function()
-			for k, v in pairs(solyanka_ini.hotkey) do 
-				local hk = makeHotKey(k) 
-				if tonumber(hk[1]) ~= 0 then 
-					rkeys.unRegisterHotKey(hk) 
-				end 
-			end
-			suspendkeys = 1 
-			menu.main.v = not menu.main.v
-		end)
-		
-		sampRegisterChatCommand('changepassword', cmd_changepassword)
-		sampRegisterChatCommand('zas', cmd_zas)
-		sampRegisterChatCommand('zastupil', cmd_zas)
-		sampRegisterChatCommand('pok', cmd_pok)
-		sampRegisterChatCommand('pokinul', cmd_pok)
-		sampRegisterChatCommand("viezd", cmd_viezd)
-		sampRegisterChatCommand("cam", cmd_cam)
-		
 		imgui.Process = true
 		needtoreload = true
 		chatManager.initQueue()
@@ -250,6 +231,21 @@ function main()
 		
 		script.loaded = true
 		script.sendMessage("Скрипт by " .. unpack(thisScript().authors) .. " запущен. Открыть главное меню - /solyanka")
+		
+		sampRegisterChatCommand("solyanka", function()
+			for k, v in pairs(solyanka_ini.hotkey) do 
+				local hk = makeHotKey(k) 
+				if tonumber(hk[1]) ~= 0 then 
+					rkeys.unRegisterHotKey(hk) 
+				end 
+			end
+			suspendkeys = 1
+			menu.main.v = not menu.main.v
+		end)
+		sampRegisterChatCommand('changepassword', cmd_changepassword)
+		sampRegisterChatCommand("viezd", cmd_viezd)
+		sampRegisterChatCommand("cam", cmd_cam)
+		
 		while true do
 			wait(0)
 			
@@ -1190,8 +1186,6 @@ function checkaccess(p)
 				end
 			end
 			script.sendMessage(currentNick:gsub("_", " ") .. " — успешная авторизация!")
-			solyanka_ini.values.password = script.password
-			inicfg.save(solyanka_ini, settings)
 			local info = decodeJson(response)
 			if info ~= nil then
 				script.v.num = info.version
@@ -1208,6 +1202,9 @@ function checkaccess(p)
 					return
 				end
 				script.checked = true
+				solyanka_ini.values.password = p
+				inicfg.save(solyanka_ini, settings)
+				return
 				else
 				script.sendMessage("Произошла ошибка при декодировании json")
 				script.unload = true
