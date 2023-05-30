@@ -1,12 +1,16 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
-script_version("19.05.2023")
-script_version_number(14)
+script_version("30.05.2023")
+script_version_number(15)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
 	checked = false, -- проведены ли все, необходимые для работы скрипта, проверки
 	password = nil, -- пользовательский пароль
+	admin = {
+		status = false, -- статус админ-доступа
+		info = nil -- информация администраторов
+	},
 	freereq = true, -- свободна ли функция req() для выполнения запроса
 	complete = true, -- завершена ли загрузка
 	update = false, -- статус обновления
@@ -27,11 +31,9 @@ local cmds = { -- команды скрипта
 	"/solyanka - открыть главное меню скрипта",
 	"/solyankaup - обновить скрипт",
 	"/viezd - доложить о выезде колонны ВМО",
-	"/cam on/off - включить/отключить/отыграть камеру"
 }
 local var = { -- игровые переменные скрипта
 	needtocl = true, -- необходимо надеть 7 клист
-	mon = {lspd, lvpd, sfpd, sfa, fbi = 0, 0, 0, 0, 0} -- мониторинг складов гос структур
 }
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
@@ -53,7 +55,6 @@ local config = {
 		sex = false,
 		cl7 = false,
 		autocl = false,
-		mat = false,
 		seedo = false
 	},
 	hotkey = {
@@ -92,7 +93,13 @@ local menu = { -- imgui-меню
 	information = imgui.ImBool(false),
 	commands = imgui.ImBool(false),
 	target = imgui.ImBool(false),
-	interaction = imgui.ImBool(false)
+	interaction = imgui.ImBool(false),
+	admin = imgui.ImBool(false),
+	add = imgui.ImBool(false),
+	remove = imgui.ImBool(false),
+	removenick = nil,
+	change = imgui.ImBool(false),
+	changenick = nil
 }
 imgui.ShowCursor = false
 
@@ -101,7 +108,6 @@ local colors = style.Colors
 local clr = imgui.Col
 local suspendkeys = 2 -- 0 хоткеи включены, 1 -- хоткеи выключены -- 2 хоткеи необходимо включить
 local ImVec4 = imgui.ImVec4
-local imfonts = {mainFont = nil, smallmainFont = nil, memfont = nil}
 local targetId, targetNick, targetRank, playerNick, playerRank
 local tag = ""
 local a = ""
@@ -203,9 +209,11 @@ function main()
 					if not res or res == "" then script.sendMessage("Диалог был закрыт.") return end
 					p = res
 				end
+				script.sendMessage("Осуществляю попытку авторизации...")
 				checkaccess(p)
 			end)
 		end)
+		sampRegisterChatCommand("request", cmd_request)
 		
 		while not script.checked do wait(0) end
 		sampUnregisterChatCommand("sologin")
@@ -244,8 +252,6 @@ function main()
 		end)
 		sampRegisterChatCommand('changepassword', cmd_changepassword)
 		sampRegisterChatCommand("viezd", cmd_viezd)
-		sampRegisterChatCommand("cam", cmd_cam)
-		
 		while true do
 			wait(0)
 			
@@ -353,80 +359,61 @@ function main()
 		end
 end
 -------------------------------------------------------------------------[IMGUI]-------------------------------------------------------------------------------------------
-function apply_custom_styles()
+function style()
 	imgui.SwitchContext()
-	local style = imgui.GetStyle()
+	local style  = imgui.GetStyle()
 	local colors = style.Colors
-	local clr = imgui.Col
+	local clr    = imgui.Col
 	local ImVec4 = imgui.ImVec4
 	
-	imgui.GetStyle().WindowPadding = imgui.ImVec2(8, 8)
-	imgui.GetStyle().WindowRounding = 16.0
-	imgui.GetStyle().FramePadding = imgui.ImVec2(5, 3)
-	imgui.GetStyle().ItemSpacing = imgui.ImVec2(4, 4)
-	imgui.GetStyle().ItemInnerSpacing = imgui.ImVec2(5, 5)
-	imgui.GetStyle().IndentSpacing = 9.0
-	imgui.GetStyle().ScrollbarSize = 17.0
-	imgui.GetStyle().ScrollbarRounding = 16.0
-	imgui.GetStyle().GrabMinSize = 7.0
-	imgui.GetStyle().GrabRounding = 6.0
-	imgui.GetStyle().ChildWindowRounding = 6.0
-	imgui.GetStyle().FrameRounding = 6.0
+    style.FrameRounding    = 4.0
+    style.GrabRounding     = 4.0
 	
-	colors[clr.Text] = ImVec4(1.00, 1.00, 1.00, 1.00)
-	colors[clr.TextDisabled] = ImVec4(0.73, 0.75, 0.74, 1.00)
-	colors[clr.WindowBg] = ImVec4(0.42, 0.48, 0.16, 1.00)
-	colors[clr.ChildWindowBg] = ImVec4(0.00, 0.00, 0.00, 0.00)
-	colors[clr.PopupBg] = ImVec4(0.08, 0.08, 0.08, 0.94)
-	colors[clr.Border] = ImVec4(0.43, 0.43, 0.50, 0.50)
-	colors[clr.BorderShadow] = ImVec4(0.00, 0.00, 0.00, 0.00)
-	colors[clr.FrameBg] = ImVec4(0.41, 0.49, 0.24, 0.54)
-	colors[clr.FrameBgHovered] = ImVec4(0.26, 0.32, 0.13, 0.54)
-	colors[clr.FrameBgActive] = ImVec4(0.33, 0.39, 0.20, 0.54)
-	colors[clr.TitleBg] = ImVec4(0.42, 0.48, 0.16, 0.90)
-	colors[clr.TitleBgActive] = ImVec4(0.42, 0.48, 0.16, 1.00)
-	colors[clr.TitleBgCollapsed] = ImVec4(0.33, 0.44, 0.26, 0.67)
-	colors[clr.MenuBarBg] = ImVec4(0.60, 0.67, 0.44, 0.54)
-	colors[clr.ScrollbarBg] = ImVec4(0.02, 0.02, 0.02, 0.53)
-	colors[clr.ScrollbarGrab] = ImVec4(0.42, 0.48, 0.16, 0.54)
-	colors[clr.ScrollbarGrabHovered] = ImVec4(0.85, 0.98, 0.26, 0.54)
-	colors[clr.ScrollbarGrabActive] = ImVec4(0.51, 0.51, 0.51, 1.00)
-	colors[clr.ComboBg] = colors[clr.PopupBg]
-	colors[clr.CheckMark] = ImVec4(1.00, 1.00, 1.00, 1.00)
-	colors[clr.SliderGrab] = ImVec4(0.35, 0.43, 0.16, 0.84)
-	colors[clr.SliderGrabActive] = ImVec4(0.53, 0.53, 0.53, 1.00)
-	colors[clr.Button] = ImVec4(0.42, 0.48, 0.16, 0.54)
-	colors[clr.ButtonHovered] = ImVec4(0.85, 0.98, 0.26, 0.54)
-	colors[clr.ButtonActive] = ImVec4(0.62, 0.75, 0.32, 1.00)
-	colors[clr.Header] = ImVec4(0.33, 0.42, 0.15, 0.54)
-	colors[clr.HeaderHovered] = ImVec4(0.85, 0.98, 0.26, 0.54)
-	colors[clr.HeaderActive] = ImVec4(0.84, 0.66, 0.66, 0.00)
-	colors[clr.Separator] = ImVec4(0.43, 0.43, 0.50, 0.50)
-	colors[clr.SeparatorHovered] = ImVec4(0.43, 0.54, 0.18, 0.54)
-	colors[clr.SeparatorActive] = ImVec4(0.52, 0.62, 0.28, 0.54)
-	colors[clr.ResizeGrip] = ImVec4(0.66, 0.80, 0.35, 0.54)
-	colors[clr.ResizeGripHovered] = ImVec4(0.44, 0.48, 0.34, 0.54)
-	colors[clr.ResizeGripActive] = ImVec4(0.37, 0.37, 0.35, 0.54)
-	colors[clr.CloseButton] = ImVec4(0.41, 0.41, 0.41, 1.00)
-	colors[clr.CloseButtonHovered] = ImVec4(0.52, 0.63, 0.26, 0.54)
-	colors[clr.CloseButtonActive] = ImVec4(0.81, 1.00, 0.37, 0.54)
-	colors[clr.PlotLines] = ImVec4(0.61, 0.61, 0.61, 1.00)
-	colors[clr.PlotLinesHovered] = ImVec4(0.79, 1.00, 0.32, 0.54)
-	colors[clr.PlotHistogram] = ImVec4(0.90, 0.70, 0.00, 1.00)
-	colors[clr.PlotHistogramHovered] = ImVec4(1.00, 0.60, 0.00, 1.00)
-	colors[clr.TextSelectedBg] = ImVec4(0.26, 0.59, 0.98, 0.35)
-	colors[clr.ModalWindowDarkening] = ImVec4(0.80, 0.80, 0.80, 0.35)
-	
-	
-	imgui.GetIO().Fonts:Clear()
-	imfonts.mainFont = imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14)..'\\times.ttf', 20.0, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
-	imfonts.smallmainFont = imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14)..'\\times.ttf', 16.0, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
-	imfonts.memfont = imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14)..'\\times.ttf', 20.0, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
-	
-	imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14)..'\\times.ttf', 14.0, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
-	imgui.RebuildFonts()
+    colors[clr.FrameBg]                = ImVec4(0.48, 0.16, 0.16, 0.54)
+	colors[clr.FrameBgHovered]         = ImVec4(0.98, 0.26, 0.26, 0.40)
+	colors[clr.FrameBgActive]          = ImVec4(0.98, 0.26, 0.26, 0.67)
+	colors[clr.TitleBg]                = ImVec4(0.48, 0.16, 0.16, 1.00)
+	colors[clr.TitleBgActive]          = ImVec4(0.48, 0.16, 0.16, 1.00)
+	colors[clr.TitleBgCollapsed]       = ImVec4(0.00, 0.00, 0.00, 0.51)
+	colors[clr.CheckMark]              = ImVec4(0.98, 0.26, 0.26, 1.00)
+	colors[clr.SliderGrab]             = ImVec4(0.88, 0.26, 0.24, 1.00)
+	colors[clr.SliderGrabActive]       = ImVec4(0.98, 0.26, 0.26, 1.00)
+	colors[clr.Button]                 = ImVec4(0.98, 0.26, 0.26, 0.40)
+	colors[clr.ButtonHovered]          = ImVec4(0.98, 0.26, 0.26, 1.00)
+	colors[clr.ButtonActive]           = ImVec4(0.98, 0.06, 0.06, 1.00)
+	colors[clr.Header]                 = ImVec4(0.98, 0.26, 0.26, 0.31)
+	colors[clr.HeaderHovered]          = ImVec4(0.98, 0.26, 0.26, 0.80)
+	colors[clr.HeaderActive]           = ImVec4(0.98, 0.26, 0.26, 1.00)
+	colors[clr.Separator]              = colors[clr.Border]
+	colors[clr.SeparatorHovered]       = ImVec4(0.75, 0.10, 0.10, 0.78)
+	colors[clr.SeparatorActive]        = ImVec4(0.75, 0.10, 0.10, 1.00)
+	colors[clr.ResizeGrip]             = ImVec4(0.98, 0.26, 0.26, 0.25)
+	colors[clr.ResizeGripHovered]      = ImVec4(0.98, 0.26, 0.26, 0.67)
+	colors[clr.ResizeGripActive]       = ImVec4(0.98, 0.26, 0.26, 0.95)
+	colors[clr.TextSelectedBg]         = ImVec4(0.98, 0.26, 0.26, 0.35)
+	colors[clr.Text]                   = ImVec4(1.00, 1.00, 1.00, 1.00)
+	colors[clr.TextDisabled]           = ImVec4(0.50, 0.50, 0.50, 1.00)
+	colors[clr.WindowBg]               = ImVec4(0.06, 0.06, 0.06, 0.94)
+	colors[clr.ChildWindowBg]          = ImVec4(1.00, 1.00, 1.00, 0.00)
+	colors[clr.PopupBg]                = ImVec4(0.08, 0.08, 0.08, 0.94)
+	colors[clr.ComboBg]                = colors[clr.PopupBg]
+	colors[clr.Border]                 = ImVec4(0.43, 0.43, 0.50, 0.50)
+	colors[clr.BorderShadow]           = ImVec4(0.00, 0.00, 0.00, 0.00)
+	colors[clr.MenuBarBg]              = ImVec4(0.14, 0.14, 0.14, 1.00)
+	colors[clr.ScrollbarBg]            = ImVec4(0.02, 0.02, 0.02, 0.53)
+	colors[clr.ScrollbarGrab]          = ImVec4(0.31, 0.31, 0.31, 1.00)
+	colors[clr.ScrollbarGrabHovered]   = ImVec4(0.41, 0.41, 0.41, 1.00)
+	colors[clr.ScrollbarGrabActive]    = ImVec4(0.51, 0.51, 0.51, 1.00)
+	colors[clr.CloseButton]            = ImVec4(0.41, 0.41, 0.41, 0.50)
+	colors[clr.CloseButtonHovered]     = ImVec4(0.98, 0.39, 0.36, 1.00)
+	colors[clr.CloseButtonActive]      = ImVec4(0.98, 0.39, 0.36, 1.00)
+	colors[clr.PlotLines]              = ImVec4(0.61, 0.61, 0.61, 1.00)
+	colors[clr.PlotLinesHovered]       = ImVec4(1.00, 0.43, 0.35, 1.00)
+	colors[clr.PlotHistogram]          = ImVec4(0.90, 0.70, 0.00, 1.00)
+	colors[clr.PlotHistogramHovered]   = ImVec4(1.00, 0.60, 0.00, 1.00)
+	colors[clr.ModalWindowDarkening]   = ImVec4(0.80, 0.80, 0.80, 0.35)
 end
-apply_custom_styles()
+style()
 
 function imgui.TextColoredRGB(text)
 	local style = imgui.GetStyle()
@@ -491,8 +478,8 @@ function imgui.OnDrawFrame()
 	if menu.main.v then -- меню скрипта
 		imgui.SwitchContext()
 		colors[clr.WindowBg] = ImVec4(0.06, 0.06, 0.06, 0.94)
-		imgui.PushFont(imfonts.mainFont)
 		imgui.ShowCursor = true
+		imgui.LockPlayer = true
 		local sw, sh = getScreenResolution()
 		imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 		imgui.SetNextWindowSize(imgui.ImVec2(815, 600), imgui.Cond.FirstUseEver)
@@ -501,14 +488,19 @@ function imgui.OnDrawFrame()
 		local ww = imgui.GetWindowWidth()
 		local wh = imgui.GetWindowHeight()
 		
-		if imgui.Button("Настройки", imgui.ImVec2(397.0, 35.0)) then menu.settings.v = true menu.information.v = false menu.commands.v = false end
+		local mainButtonsWidth = script.admin.status and 262.0 or 397.0
+		
+		if imgui.Button("Настройки", imgui.ImVec2(mainButtonsWidth, 35.0)) then menu.settings.v = true menu.information.v = false menu.commands.v = false menu.admin.v = false end
 		imgui.SameLine()
-		if imgui.Button("Информация", imgui.ImVec2(397.0, 35.0)) then menu.settings.v = false menu.information.v = true menu.commands.v = false end
+		if imgui.Button("Информация", imgui.ImVec2(mainButtonsWidth, 35.0)) then menu.settings.v = false menu.information.v = true menu.commands.v = false menu.admin.v = false end
+		if script.admin.status then
+			imgui.SameLine()
+			if imgui.Button("Панель администратора", imgui.ImVec2(mainButtonsWidth, 35.0)) then menu.settings.v = false menu.information.v = false menu.commands.v = false menu.admin.v = true end
+		end
 		
 		if menu.settings.v and not menu.information.v then
-			imgui.BeginChild('settings', imgui.ImVec2(800, 429), true)
+			imgui.BeginChild('settings', imgui.ImVec2(800, 460), true)
 			
-			imgui.PushFont(imfonts.smallmainFont)
 			imgui.PushItemWidth(200)
 			if imgui.Combo("##Combo", buffer.clist, clists.names) then 
 				solyanka_ini.values.clist = tostring(buffer.clist.v)
@@ -548,43 +540,198 @@ function imgui.OnDrawFrame()
 				inicfg.save(solyanka_ini, settings)
 			end
 			imgui.SameLine() 
-			imgui.Text("'Автоклист' - автомаитчески вводить клист после: нач.раб.дня, завершения раб.дня, смерти")
+			imgui.Text("'Автоклист' - автоматически вводить клист после: нач.раб.дня, завершения раб.дня, смерти, разгрузки на складе с кодом 0")
 			
 			if imgui.ToggleButton("seedo", togglebools.seedo) then 
 				solyanka_ini.bools.seedo = togglebools.seedo.v
 				inicfg.save(solyanka_ini, settings)
 			end
 			imgui.SameLine() 
-			imgui.Text("Отправлять /seedo при определённых событиях")
+			imgui.Text("Отправлять /seedo при входящих SMS [Если SMS от военнослужащего - напишет его звание]")
 			
 			if imgui.ToggleButton("psihosbiv", togglebools.psihosbiv) then 
 				solyanka_ini.bools.psihosbiv = togglebools.psihosbiv.v
 				inicfg.save(solyanka_ini, settings)
 			end
 			imgui.SameLine() 
-			imgui.Text("Сбивать анимацию приёма психохила")
-			imgui.PopFont()
+			imgui.Text("Сбивать анимацию приёма психохила чатом")
 			
 			imgui.EndChild()
 		end
 		
-		if not menu.settings.v and menu.information.v then
+		if not menu.settings.v and menu.information.v and not menu.admin.v then
 			imgui.Text("Данный скрипт является кучей всякого говна")
 			imgui.Text("Автор: Cody_Webb | Telegram: @ibm287")
 			imgui.SameLine()
-			imgui.PushFont(imfonts.smallmainFont)
 			if imgui.Button("Написать разработчику", imgui.ImVec2(180.0, 23.0)) then os.execute('explorer "https://t.me/ibm287"') end
-			imgui.PopFont()
 			imgui.NewLine()
 			imgui.Text("Все настройки автоматически сохраняются в файл:\nmoonloader//config//solyanka//Server//Nick_Name")
 			imgui.NewLine()
 			imgui.Text("Информация о последних обновлениях:")
-			imgui.BeginChild('information', imgui.ImVec2(800, 265), true)
+			imgui.BeginChild('information', imgui.ImVec2(800, 329), true)
 			for num, text in ipairs(script.upd.changes) do
 				imgui.Text(num .. ') ' .. text)
 				imgui.NewLine()
 			end
 			imgui.EndChild()
+		end
+		
+		if not menu.settings.v and not menu.information.v and menu.admin.v then
+			imgui.BeginChild('admin', imgui.ImVec2(800, 460), true)
+			if script.admin.info ~= nil then
+				imgui.BeginChild('access', imgui.ImVec2(770, 200), true)
+				imgui.Columns(3, "Columns", true)
+				imgui.Text("Ник:")
+				imgui.NextColumn()
+				imgui.Text("Админ:")
+				imgui.NextColumn()
+				imgui.Text("Дата последней авторизации:")
+				imgui.NextColumn()
+				for k, v in ipairs(script.admin.info.access) do
+					local id = sampGetPlayerIdByNickname(v.nick)
+					imgui.Separator()
+					imgui.SetColumnWidth(-1, 500)
+					if imgui.Selectable(v.nick .. (id ~= nil and "[" .. id .. "]" or "")) then
+						menu.removenick = v.nick
+						menu.remove.v = true
+					end
+					imgui.NextColumn()
+					imgui.SetColumnWidth(-1, 60)
+					imgui.PushID(k)
+					if imgui.Selectable(v.admin and "ADMIN" or "USER") then
+						menu.changenick = v.nick
+						menu.change.v = true
+					end
+					imgui.PopID()
+					imgui.NextColumn()
+					imgui.TextColoredRGB(v.date)
+					imgui.NextColumn()
+				end
+				imgui.EndChild()
+				imgui.BeginChild('log', imgui.ImVec2(770, 440), true)
+				imgui.Columns(3, "Columns", true)
+				imgui.Text("Дата:")
+				imgui.NextColumn()
+				imgui.Text("Ник:")
+				imgui.NextColumn()
+				imgui.Text("Действие:")
+				imgui.NextColumn()
+				for _, v in ipairs(script.admin.info.log) do
+					local id = sampGetPlayerIdByNickname(v.nick)
+					imgui.Separator()
+					imgui.SetColumnWidth(-1, 85)
+					imgui.Text(v.date)
+					imgui.NextColumn()
+					imgui.SetColumnWidth(-1, 200)
+					imgui.Text(v.nick .. (id ~= nil and "[" .. id .. "]" or ""))
+					imgui.NextColumn()
+					imgui.TextColoredRGB(v.action)
+					imgui.NextColumn()
+				end
+				imgui.EndChild()
+				else
+				imgui.Text("Происходит загрузка информации, ожидайте...") 
+			end
+			imgui.EndChild()
+			if imgui.Button("Обновить информацию из базы данных", imgui.ImVec2(270.0, 26.0)) then
+				lua_thread.create(function()
+					script.admin.info = nil
+					response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
+					script.admin.info = decodeJson(response)
+				end)
+			end
+			if imgui.Button("Добавить пользователя скрипта", imgui.ImVec2(270.0, 26.0)) then
+				menu.add.v = true
+			end
+		end
+		
+		if menu.add.v then
+			imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+			imgui.SetNextWindowSize(imgui.ImVec2(600, 115), imgui.Cond.FirstUseEver)
+			imgui.Begin("Ввод ID/Nickname", menu.add, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
+			imgui.Text("Введите в текстовую строку ID или ник игрока, которого вы хотите добавить в базу данных")
+			imgui.PushItemWidth(300)
+			local input = imgui.ImBuffer("", 256)
+			if imgui.InputText('##add', input) then
+				res = tostring(input.v)
+			end
+			if imgui.Button("Добавить", imgui.ImVec2(100.0, 23.0)) then  
+				lua_thread.create(function()
+					local nick = res
+					if tonumber(res) ~= nil then 
+						local id = tonumber(res)
+						if not sampIsPlayerConnected(id) then script.sendMessage("Игрок не найден!") end
+						nick = sampGetPlayerNickname(id)
+					end
+					menu.add.v = false
+					script.sendMessage("Выполняю...")
+					response = req(macros .. "=add&nick=" .. nick .. "&admin=" .. currentNick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
+					if response == "You're not admin" then script.sendMessage("У вас отсутвуют права администратора скрипта!") end
+					if response == "Successfuly added" then 
+						script.sendMessage("Игрок был добавлен в базу данных скрипта!") 
+						script.admin.info = nil
+						response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
+						script.admin.info = decodeJson(response)
+					end
+				end)
+			end
+			imgui.PopItemWidth()
+			imgui.End()
+		end
+		
+		if menu.remove.v then
+			imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+			imgui.SetNextWindowSize(imgui.ImVec2(600, 75), imgui.Cond.FirstUseEver)
+			imgui.Begin("Удаление игрока " .. menu.removenick .. " из базы данных скрипта", menu.remove, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
+			imgui.Text("Нажмите 'Согласен' если вы действительно хотите удалить пользователя скрипта")
+			imgui.PushItemWidth(300)
+			if imgui.Button("Согласен", imgui.ImVec2(100.0, 23.0)) then  
+				lua_thread.create(function()
+					menu.remove.v = false
+					script.sendMessage("Выполняю...")
+					response = req(macros .. "=remove&nick=" .. menu.removenick .. "&admin=" .. currentNick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
+					if response == "You're not admin" then script.sendMessage("У вас отсутвуют права администратора скрипта!") end
+					if response == "Successfuly removed" or response == "Unsuccessfuly removed" then 
+						script.sendMessage("Игрок был удалён из базы данных скрипта!")
+						script.admin.info = nil
+						response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
+						script.admin.info = decodeJson(response)
+					end
+				end)
+			end
+			imgui.PopItemWidth()
+			imgui.End()
+		end
+		
+		if menu.change.v then
+			imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+			imgui.SetNextWindowSize(imgui.ImVec2(600, 75), imgui.Cond.FirstUseEver)
+			imgui.Begin("Изменить права пользователя " .. menu.changenick .. " в базе данных скрипта", menu.change, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
+			imgui.Text("Нажмите 'Согласен' если вы действительно хотите изменить права")
+			imgui.PushItemWidth(300)
+			if imgui.Button("Согласен", imgui.ImVec2(100.0, 23.0)) then  
+				lua_thread.create(function()
+					menu.change.v = false
+					script.sendMessage("Выполняю...")
+					response = req(macros .. "=change&nick=" .. menu.changenick .. "&admin=" .. currentNick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
+					if response == "You're not admin" then script.sendMessage("У вас отсутвуют права администратора скрипта!") end
+					local newstatus = response:match("Successfuly changed as (.*)")
+					if newstatus ~= nil then 
+						script.sendMessage(newstatus == "admin" and "Пользователь был успешно назначен администратором скрипта" or "Пользователь был лишён прав администратора")
+						script.admin.info = nil
+						response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
+						script.admin.info = decodeJson(response)
+					end
+				end)
+			end
+			imgui.PopItemWidth()
+			imgui.End()
 		end
 		
 		if menu.commands.v then
@@ -598,38 +745,34 @@ function imgui.OnDrawFrame()
 			imgui.End()
 		end
 		
-		imgui.SetCursorPos(imgui.ImVec2(25, wh/2 + 250))
-		local found = false
-		for i = 0, 1000 do
-			if sampIsPlayerConnected(i) and sampGetPlayerScore(i) ~= 0 then
-				if sampGetPlayerNickname(i) == "Cody_Webb" then
-					local ownernick = sampGetPlayerNickname(i)
-					if imgui.Button(ownernick .. "[" .. i .. "] сейчас в сети", imgui.ImVec2(260.0, 30.0)) then
-						chatManager.addMessageToQueue("/sms " .. i .. " Я пользуюсь solyanka.lua, большое спасибо")
+		if not menu.admin.v then
+			local found = false
+			for i = 0, 1000 do
+				if sampIsPlayerConnected(i) and sampGetPlayerScore(i) ~= 0 then
+					if sampGetPlayerNickname(i) == "Cody_Webb" then
+						local ownernick = sampGetPlayerNickname(i)
+						if imgui.Button(ownernick .. "[" .. i .. "] сейчас в сети", imgui.ImVec2(260.0, 30.0)) then
+							chatManager.addMessageToQueue("/sms " .. i .. " Я пользуюсь solyanka.lua, большое спасибо")
+						end
+						found = true
 					end
-					found = true
 				end
 			end
-		end
-		if not found then
-			if imgui.Button("Cody Webb сейчас не в сети", imgui.ImVec2(260.0, 30.0)) then
-				script.sendMessage("Cody Webb играет на Revolution (сейчас не онлайн)")
+			if not found then
+				if imgui.Button("Cody Webb сейчас не в сети", imgui.ImVec2(260.0, 30.0)) then
+					script.sendMessage("Cody Webb играет на Revolution (сейчас не онлайн)")
+				end
 			end
+			
+			if imgui.Button("Все команды скрипта", imgui.ImVec2(170.0, 23.0)) then menu.commands.v = true end
 		end
-		
-		imgui.PushFont(imfonts.smallmainFont)
-		imgui.SetCursorPos(imgui.ImVec2(25, wh/2 + 215))
-		if imgui.Button("Все команды скрипта", imgui.ImVec2(170.0, 23.0)) then menu.commands.v = true end
-		imgui.PopFont()
 		
 		imgui.End()
-		imgui.PopFont()
 	end
 	
 	if menu.interaction.v then
 		imgui.SwitchContext()
 		colors[clr.WindowBg] = ImVec4(0.06, 0.06, 0.06, 0.94)
-		imgui.PushFont(imfonts.mainFont)
 		imgui.ShowCursor = true
 		local sw, sh = getScreenResolution()
 		imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -653,7 +796,6 @@ function imgui.OnDrawFrame()
 		end
 		imgui.EndChild()
 		imgui.End()
-		imgui.PopFont()
 	end
 	
 	imgui.SwitchContext() -- Overlay
@@ -663,49 +805,16 @@ function imgui.OnDrawFrame()
 	if menu.target.v then
 		if not SetMode then imgui.SetNextWindowPos(imgui.ImVec2(500, 500)) else if SetModeFirstShow then imgui.SetNextWindowPos(imgui.ImVec2(500, 500)) end end -- таргет-меню
 		imgui.Begin('#empty_field', menu.target, 1 + 32 + 2 + SetModeCond + 64)
-		imgui.PushFont(imfonts.mainFont)
 		if targetId ~= nil and targetNick ~= nil then
 			local targetClist = "{" .. ("%06x"):format(bit.band(sampGetPlayerColor(targetId), 0xFFFFFF)) .. "}"
 			imgui.TextColoredRGB('Текущая цель: ' .. (targetClist ~= nil and targetClist or '') .. targetNick .. '[' .. targetId .. ']')
 			imgui.TextColoredRGB('O' .. ' - меню взаимодействия')
 		end
-		imgui.PopFont()
 		imgui.End()
 	end
 	
 end
 -------------------------------------------------------------------------[ФУНКЦИИ]-----------------------------------------------------------------------------------------
--- function getoffmembers()
--- local temp = os.tmpname()
--- local time = os.time()
--- local found = false
--- downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
--- if (status == 58) then
--- local file = io.open(temp, "r")
--- if file ~= nil then
--- local filetext = file:read("*a")
--- text = encoding.UTF8:decode(filetext)
--- local members = text:match(u8:decode"data%: (.*)columns%: %["):match("%[(.*)%]%,")
--- for offnick, offrank, offtm, offwm, offdate in string.gmatch(members, '%[%"(%a+%_%a+)%"%,(%d+)%,%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]') do
--- if offnick ~= nil and tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
--- offrank = tonumber(offrank)
--- offtm = tonumber(offtm)
--- offwm = tonumber(offwm)
--- offmembers[offnick] = {rank = offrank, zv = zv[offrank], zvskl = zvskl[offrank], tm = offtm, wm = offwm, date = offdate}
--- end
--- end
--- file:close()
--- os.remove(temp)
--- else
--- if (os.time() - time > 10) then
--- script.sendMessage("Превышено время загрузки файла, повторите попытку")
--- return
--- end
--- end
--- end
--- end)
--- end
-
 function ev.onServerMessage(col, text)
 	if script.loaded then
 		if waitforchangeclist and col == -1 and text:match(u8:decode"Цвет выбран") ~= nil then waitforchangeclist = false end
@@ -817,78 +926,6 @@ function ev.onServerMessage(col, text)
 				end
 			end
 		end
-		local myid = select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))
-		local myn, myf = sampGetPlayerNickname(myid):match("(.*)%_(.*)")
-		--local re1 = regex.new("\\{\\{ Солдат ([A-Za-z]+)\\_([A-Za-z]+)\\: ((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)тал(.*)|(.*)дравия(.*)елаю(.*)тал(.*)|(.*)дравия(.*)це(.*)|(.*)дравия(.*)ойцы(.*)|(.*)дравия(.*)елаю(.*)ойцы(.*)|(.*)дравия(.*)елаю(.*)це(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*)) \\}\\}")
-		--local re2 = regex.new(" ([A-Za-z]+)\\_([A-Za-z]+) крикнула?\\: ((.*)дравия(.*)аза|(.*)дравия(.*)елаю(.*)аза|(.*)дравия(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)варищи(.*)|(.*)дравия(.*)елаю(.*)рмия(.*)|(.*)дравия(.*)рмия(.*)|(.*)дравия(.*)це(.*)|(.*)дравия(.*)елаю(.*)це(.*)|(.*)дравия(.*)тал(.*)|(.*)дравия(.*)елаю(.*)тал(.*)|(.*)дравия(.*)ойцы(.*)|(.*)дравия(.*)елаю(.*)ойцы(.*)|(.*)дравия(.*)елаю(.*)сть(.*)|(.*)дравия(.*)сть(.*))")
-		-- if re1:match(text) ~= nil then
-		-- local name, surname = re1:match(text)
-		-- if myn ~= name and myf ~= surname then
-		-- local offnick = ("" .. name .. "_" .. surname .. "")
-		-- local temp = os.tmpname()
-		-- local time = os.time()
-		-- local found = false
-		-- downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
-		-- if (status == 58) then
-		-- local file = io.open(temp, "r")
-		-- local currentRank
-		-- for line in file:lines() do
-		-- line = encoding.UTF8:decode(line)
-		-- local offrank, offtm, offwm, offdate = line:match('%["' .. offnick .. '",(%d+),%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]')
-		-- if tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
-		-- found = true
-		-- currentRank = tonumber(offrank)
-		-- end
-		-- end
-		-- if not found then script.sendMessage("Ранг " .. offnick .. " не найден!") end
-		-- file:close()
-		-- os.remove(temp)
-		-- if found then
-		-- chatManager.addMessageToQueue("/s Здравия желаю, товарищ " .. zv[currentRank] .. " " .. offnick:match(".*%_(.*)") )
-		-- end
-		-- else
-		-- if (os.time() - time > 10) then
-		-- script.sendMessage("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
-		-- return
-		-- end
-		-- end
-		-- end)
-		-- end
-		-- end
-		-- if re2:match(text) ~= nil then
-		-- local name, surname = re2:match(text)
-		-- if myn ~= name and myf ~= surname then
-		-- local offnick = ("" .. name .. "_" .. surname .. "")
-		-- local temp = os.tmpname()
-		-- local time = os.time()
-		-- local found = false
-		-- downloadUrlToFile("http://srp-addons.ru/om/fraction/Army%20LV", temp, function(_, status)
-		-- if (status == 58) then
-		-- local file = io.open(temp, "r")
-		-- local currentRank
-		-- for line in file:lines() do
-		-- line = encoding.UTF8:decode(line)
-		-- local offrank, offtm, offwm, offdate = line:match('%["' .. offnick .. '",(%d+),%[(%d+),(%d+)%],"(%d+/%d+/%d+ %d+%:%d+%:%d+)"%]')
-		-- if tonumber(offrank) ~= nil and tonumber(offtm) ~= nil and tonumber(offwm) ~= nil and offdate ~= nil then
-		-- found = true
-		-- currentRank = tonumber(offrank)
-		-- end
-		-- end
-		-- if not found then script.sendMessage("Ранг " .. offnick .. " не найден!") end
-		-- file:close()
-		-- os.remove(temp)
-		-- if found then
-		-- chatManager.addMessageToQueue("/s Здравия желаю, товарищ " .. zv[currentRank] .. " " .. offnick:match(".*%_(.*)"))
-		-- end
-		-- else
-		-- if (os.time() - time > 10) then
-		-- script.sendMessage("Превышено время загрузки файла, повторите попытку", 0xFFFFFFFF)
-		-- return
-		-- end
-		-- end
-		-- end)
-		-- end
-		-- end
 	end
 end
 
@@ -1004,7 +1041,7 @@ function f(t)
 	end
 end
 --------------------------------------------------------------------------------------------------------------------------
-function cmd_viezd(s) -- доклад о выезде грузовиков
+function cmd_viezd(s) -- доклад о выезде грузовиков снабжения
 	lua_thread.create(function()
 		if s == "" then script.sendMessage("Ошибка! Введите /viezd [число грузовиков] [пункт назначения]") return end
 		local p = {}
@@ -1013,29 +1050,17 @@ function cmd_viezd(s) -- доклад о выезде грузовиков
 		if tonumber(p[1]) == nil or k[tonumber(p[1])] == nil then script.sendMessage("Неверное число грузовиков!") return end
 		local kol = tonumber(p[1])
 		local arr = {
-			["ls"] = "Police LS", ["lspd"] = "Police LS", ["лс"] = "Police LS", ["лспд"] = "Police LS",
-			["sfpd"] = "Police SF", ["сфпд"] = "Police SF",
 			["lv"] = "Police LV", ["lvpd"] = "Police LV", ["лв"] = "Police LV", ["лвпд"] = "Police LV",
-			["fbi"] = "FBI", ["фбр"] = "FBI",
+			["ls"] = "Police LS", ["lspd"] = "Police LS", ["лс"] = "Police LS", ["лспд"] = "Police LS",
+			["lvls"] = "Police LV/Police LS", ["lv/ls"] = "Police LV/Police LS", ["лвлс"] = "Police LV/Police LS", ["лв/лс"] = "Police LV/Police LS", ["lslv"] = "Police LV/Police LS", ["ls/lv"] = "Police LV/Police LS", ["лслв"] = "Police LV/Police LS", ["лс/лв"] = "Police LV/Police LS",
+			["sf"] = "г. San-Fierro", ["сф"] = "г. San-Fierro",
 			["sfa"] = "Army SF", ["сфа"] = "Army SF",
-			["sf"] = "г. San-Fierro", ["сф"] = "г. San-Fierro"
+			["sfpd"] = "Police SF", ["сфпд"] = "Police SF",
+			["fbi"] = "FBI", ["фбр"] = "FBI",
 		}
 		if arr[u8(p[2])] == nil then script.sendMessage("Неверно указан пункт назначения!") return end
 		f("Выезжаем в " .. arr[u8(p[2])] .. ", " .. k[kol])
 	end)
-end
-
-function cmd_cam(action)
-	if action:match("on") then
-		chatManager.addMessageToQueue("/seeme нажал на кнопку включения видеокамеры на бронежилете")
-		chatManager.addMessageToQueue("/seedo Камера фиксирует всё происходящее на удаленный сервер Army LV.")
-		elseif action:match("off") then
-		chatManager.addMessageToQueue("/seeme нажал на кнопку выключения записи")
-		chatManager.addMessageToQueue("/seedo Запись сохранена на удаленный сервер.")
-		else
-		chatManager.addMessageToQueue("/seedo На бронежилете закреплена видеокамера.")
-		chatManager.addMessageToQueue("/seedo Камера включена и записывает всё происходящее на удаленный сервер.")
-	end
 end
 
 function script.sendMessage(t)
@@ -1152,6 +1177,7 @@ function checkaccess(p)
 	lua_thread.create(function()
 		if p == nil or p == "" then
 			if script.password == nil or script.password == "" then
+				wait(1300)
 				if not showdialog(3, u8:decode"Введите ваш пароль:", u8:decode"Если авторизируетесь впервые — пароль будет запрошен повторно", u8:decode"Отправить") then script.sendMessage("Ошибка при создании диалогового окна.") return end
 				local res = waitForChooseInDialog(3)
 				if not res or res == "" then script.sendMessage("Диалог был закрыт, попробуйте /sologin") return end
@@ -1159,15 +1185,15 @@ function checkaccess(p)
 			end
 			p = script.password
 		end
-		script.sendMessage("Осуществляю попытку авторизации...")
+		print(u8:decode"Осуществляю попытку авторизации...")
 		local response = req(macros .. "=login&nick=" .. currentNick .. "&password=" .. p)
 		if response ~= nil then
-			if response:match("Wrong password") then
+			if response == "Wrong password" then
 				script.sendMessage("Неверный пароль, попробуйте ещё раз — /sologin")
 				return
 			end
-			if response:match("Access denied") then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует, идите нахуй!") script.noaccess = true thisScript():unload() return end
-			if response:match("Need to register") then 
+			if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+			if response == "Need to register" then 
 				script.sendMessage(currentNick:gsub("_", " ") .. " — необходима регистрация...") 
 				if not showdialog(1, u8:decode"Введите ваш новый пароль:", u8:decode"Будьте осторожны при вводе!", u8:decode"Отправить") then script.sendMessage("Ошибка при создании диалогового окна.") return end
 				local res = waitForChooseInDialog(1)
@@ -1176,7 +1202,7 @@ function checkaccess(p)
 				p = script.password
 				script.sendMessage("Осуществляю попытку регистрации...")
 				local response = req(macros .. "=login&nick=" .. currentNick .. "&password=" .. p .. "&reg=true")
-				if response:match("Successful registration") then
+				if response == "Successful registration" then
 					script.sendMessage("Вы успешно зарегистрировались, сохраняю ваш пароль и перезагружаю скрипт...")
 					solyanka_ini.values.password = script.password
 					inicfg.save(solyanka_ini, settings)
@@ -1185,9 +1211,11 @@ function checkaccess(p)
 					return
 				end
 			end
-			script.sendMessage(currentNick:gsub("_", " ") .. " — успешная авторизация!")
+			print(currentNick:gsub("_", " ") .. u8:decode" — успешная авторизация!")
 			local info = decodeJson(response)
 			if info ~= nil then
+				script.admin.status = info.admin.status == "true" and true or false
+				script.admin.info = info.admin.info
 				script.v.num = info.version
 				script.v.date = info.date
 				script.url = info.url
@@ -1202,9 +1230,11 @@ function checkaccess(p)
 					return
 				end
 				script.offmembers = info.offmembers
-				local zv = zv[script.offmembers[currentNick].rank]
-				local otm = script.offmembers[currentNick].week
-				if zv ~= nil and otm ~= nil then script.sendMessage("Товарищ " .. zv .. " " .. currentNick:match(".*%_(.*)") .. ", у вас {B30000}" .. otm .. "{FFFAFA} отметок") end
+				if script.offmembers[currentNick] ~= nil then
+					local zv = zv[script.offmembers[currentNick].rank]
+					local otm = script.offmembers[currentNick].week
+					if zv ~= nil and otm ~= nil then script.sendMessage(zv .. " " .. currentNick:match(".*%_(.*)") .. ", у вас {B30000}" .. otm .. "{FFFAFA} отметок") end
+				end
 				script.checked = true
 				solyanka_ini.values.password = p
 				inicfg.save(solyanka_ini, settings)
@@ -1230,14 +1260,14 @@ function cmd_changepassword(sparams)
 	lua_thread.create(function()
 		script.sendMessage("Осуществляюю попытку смены пароля...") 
 		local response = req(macros .. "=changepassword&nick=" .. currentNick .. "&old=" .. params[1] .. "&new=" .. params[2])
-		if response:match("Access denied") then script.sendMessage(currentnick:gsub("_", " ") .. " — доступ к скрипту отсутствует, идите нахуй!") script.noaccess = true thisScript():unload() return end
-		if response:match("Successfuly changed") then 
+		if response == "Access denied" then script.sendMessage(currentnick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+		if response == "Successfuly changed" then 
 			script.sendMessage("Пароль был успешно изменён!") 
 			solyanka_ini.values.password = params[2]
 			inicfg.save(solyanka_ini, settings) 
 			return 
 		end
-		if response:match("Wrong old password") then script.sendMessage("Старый пароль неверный!") return end
+		if response == "Wrong old password" then script.sendMessage("Старый пароль неверный!") return end
 	end)
 end
 
