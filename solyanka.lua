@@ -110,7 +110,7 @@ local suspendkeys = 2 -- 0 хоткеи включены, 1 -- хоткеи вы
 local ImVec4 = imgui.ImVec4
 local targetId, targetNick, targetRank, playerNick, playerRank
 local tag = ""
-local a = ""
+local a = " "
 local currentNick
 local alreadyUd = {}
 local checkpoint = {}
@@ -197,7 +197,7 @@ function main()
 	
 	script.password = solyanka_ini.values.password ~= "" and solyanka_ini.values.password .. " " or nil
 	tag = solyanka_ini.values.tag ~= "" and solyanka_ini.values.tag .. " " or ""
-	a = solyanka_ini.bools.sex and "а" or ""
+	a = solyanka_ini.bools.sex and "а " or " "
 	
 	checkaccess() -- проверка доступа по паролю
 	sampRegisterChatCommand('sologin', 
@@ -277,7 +277,7 @@ function main()
 						if result2 then
 							if sid ~= 287 and sid ~= 191 then
 								chatManager.addMessageToQueue("/clist 7") 
-								chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[7]))
+								chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[7]))
 							end
 						end
 					end
@@ -822,12 +822,12 @@ function ev.onServerMessage(col, text)
 		if solyanka_ini.bools.autocl and col == 1790050303 then
 			if text:match(u8:decode"^ Рабочий день окончен") then
 				chatManager.addMessageToQueue("/clist 7")
-				chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[7]))
+				chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[7]))
 				elseif text:match(u8:decode"^ Рабочий день начат") then
 				local cl = tonumber(solyanka_ini.values.clist)
 				if cl ~= nil then
 					chatManager.addMessageToQueue("/clist " .. tostring(cl))
-					chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[cl]))
+					chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[cl]))
 				end
 			end
 		end
@@ -938,7 +938,7 @@ function ev.onSendDeathNotification(reason, id)
 				lua_thread.create(function()
 					repeat wait(0) until getActiveInterior() ~= 0
 					chatManager.addMessageToQueue("/clist " .. cl)
-					chatManager.addMessageToQueue("/me надел " .. u8(belka_ini.UserClist[cl]))
+					chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[cl]))
 				end)
 			end
 		end
@@ -1037,7 +1037,7 @@ end
 
 function f(t)
 	if t ~= nil then
-		chatManager.addMessageToQueue("/f " .. u8:decode(tag .. t))
+		chatManager.addMessageToQueue("/f " .. tag .. t)
 	end
 end
 --------------------------------------------------------------------------------------------------------------------------
