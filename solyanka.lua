@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
-script_version("30.05.2023")
-script_version_number(15)
+script_version("31.05.2023")
+script_version_number(16)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
@@ -9,8 +9,9 @@ local script = { -- технические переменные скрипта
 	password = nil, -- пользовательский пароль
 	admin = {
 		status = false, -- статус админ-доступа
-		info = nil -- информация администраторов
+		info = nil -- информация для администраторов
 	},
+	house = nil, -- дата слёта дома
 	freereq = true, -- свободна ли функция req() для выполнения запроса
 	complete = true, -- завершена ли загрузка
 	update = false, -- статус обновления
@@ -29,8 +30,7 @@ local script = { -- технические переменные скрипта
 local cmds = { -- команды скрипта
 	"/changepassword [old] [new] - изменить пользовательский пароль",
 	"/solyanka - открыть главное меню скрипта",
-	"/solyankaup - обновить скрипт",
-	"/viezd - доложить о выезде колонны ВМО",
+	"/viezd [пункт назначения] [кол-во] - доложить о выезде колонны ВМО",
 }
 local var = { -- игровые переменные скрипта
 	needtocl = true, -- необходимо надеть 7 клист
@@ -55,10 +55,13 @@ local config = {
 		sex = false,
 		cl7 = false,
 		autocl = false,
-		seedo = false
+		seedo = false,
+		psihosbiv = false,
+		house = false
 	},
 	hotkey = {
-		psiho = '0'
+		psiho = '0',
+		fast = '0'
 	},
 	values = {
 		password = "",
@@ -84,6 +87,7 @@ local belka = {
 local main_color = 0xFFB30000
 local prefix = "{B30000}[СОЛЯНКА] {FFFAFA}"
 local updatingprefix = "{FF0000}[ОБНОВЛЕНИЕ] {FFFAFA}"
+local warningprefix = "{FF0000}[ACHTUNG] {FFFAFA}"
 local antiflood = 0
 local needtoreload = false
 
@@ -93,6 +97,7 @@ local menu = { -- imgui-меню
 	information = imgui.ImBool(false),
 	commands = imgui.ImBool(false),
 	target = imgui.ImBool(false),
+	fast = imgui.ImBool(false),
 	interaction = imgui.ImBool(false),
 	admin = imgui.ImBool(false),
 	add = imgui.ImBool(false),
@@ -109,9 +114,9 @@ local clr = imgui.Col
 local suspendkeys = 2 -- 0 хоткеи включены, 1 -- хоткеи выключены -- 2 хоткеи необходимо включить
 local ImVec4 = imgui.ImVec4
 local targetId, targetNick, targetRank, playerNick, playerRank
-local tag = ""
-local a = " "
-local currentNick
+local tag = "" -- тэг в рацию
+local a = " " -- буква 'а' для пола в отыгровках
+local mynick -- текущий никнейм персонажа
 local alreadyUd = {}
 local checkpoint = {}
 
@@ -145,19 +150,19 @@ local clists = {
 	}
 }
 
-local zv = {
+local zv = { -- массив наименований званий согласно их реальному порядку
 	"Рядовой", "Ефрейтор", "Младший сержант", "Сержант", "Старший сержант", 
 	"Старшина", "Прапорщик", "Младший лейтенант", "Лейтенант", "Старший лейтенант", 
 	"Капитан", "Майор", "Подполковник", "Полковник", "Генерал"
 }
 
-local zvskl = {
-	"Рядового", "Ефрейтора", "Младшего сержанта", "Сержанта", "Старшего сержанта", 
-	"Старшины", "Прапорщика", "Младшего лейтенанта", "Лейтенанта", "Старшего лейтенанта", 
-	"Капитана", "Майора", "Подполковника", "Полковника", "Генерала"
+local zvskl = { -- массив званий в склонении
+	"рядового", "eфрейтора", "младшего сержанта", "сержанта", "старшего сержанта", 
+	"старшины", "прапорщика", "младшего лейтенанта", "лейтенанта", "старшего лейтенанта", 
+	"капитана", "майора", "подполковника", "полковника", "генерала"
 }
 
-local posts = {
+local posts = { -- координаты контрольно-пропускных пунктов Army LV
 	["КПП-1"] = {x1 = 124, y1 = 1923, x2 = 185, y2 = 1965},
 	["КПП-2"] = {x1 = 83, y1 = 1911, x2 = 112, y2 = 1933},
 }
@@ -172,14 +177,14 @@ function main()
 	server = sampGetCurrentServerName():gsub('|', '')
 	server = (server:find('02') and 'Two' or (server:find('Revo') and 'Revolution' or (server:find('Legacy') and 'Legacy' or (server:find('Classic') and 'Classic' or nil))))
     if server == nil then script.sendMessage('Данный сервер не поддерживается, выгружаюсь...') script.unload = true thisScript():unload() end
-	currentNick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+	mynick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
 	
 	while sampGetGamestate() ~= 3 do wait(0) end
 	while sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) <= 0 and not sampIsLocalPlayerSpawned() do wait(0) end
 	
 	AdressConfig = string.format("%s\\config", thisScript().directory)
-    AdressFolder = string.format("%s\\config\\solyanka\\%s\\%s", thisScript().directory, server, currentNick)
-	settings = string.format("solyanka\\%s\\%s\\settings.ini", server, currentNick)
+    AdressFolder = string.format("%s\\config\\solyanka\\%s\\%s", thisScript().directory, server, mynick)
+	settings = string.format("solyanka\\%s\\%s\\settings.ini", server, mynick)
 	
 	if not doesDirectoryExist(AdressConfig) then createDirectory(AdressConfig) end
 	if not doesDirectoryExist(AdressFolder) then createDirectory(AdressFolder) end
@@ -195,22 +200,22 @@ function main()
 		belka_ini = inicfg.load(belka, belka_folder)
 	end
 	
-	script.password = solyanka_ini.values.password ~= "" and solyanka_ini.values.password .. " " or nil
-	tag = solyanka_ini.values.tag ~= "" and solyanka_ini.values.tag .. " " or ""
-	a = solyanka_ini.bools.sex and "а " or " "
+	script.password = solyanka_ini.values.password ~= "" and solyanka_ini.values.password .. " " or nil -- пароль из локального конфига скрипта
+	tag = solyanka_ini.values.tag ~= "" and solyanka_ini.values.tag .. " " or "" -- тэг из локального конфига скрипта
+	a = solyanka_ini.bools.sex and "а " or " " -- буква 'a' для пола в отыгровках
 	
-	checkaccess() -- проверка доступа по паролю
+	script.login() -- проверка доступа по паролю
 	sampRegisterChatCommand('sologin', 
 		function(p) 
 			lua_thread.create(function()
 				if p == nil or p == "" then
 					if not showdialog(3, u8:decode"Введите ваш пароль:", u8:decode"Будьте осторожны при вводе!", u8:decode"Отправить") then script.sendMessage("Ошибка при создании диалогового окна.") return end
 					local res = waitForChooseInDialog(3)
-					if not res or res == "" then script.sendMessage("Диалог был закрыт.") return end
+					if not res or res == "" then script.sendMessage("Диалог был закрыт. Попробуйте /sologin [пароль]") return end
 					p = res
 				end
 				script.sendMessage("Осуществляю попытку авторизации...")
-				checkaccess(p)
+				script.login(p)
 			end)
 		end)
 		sampRegisterChatCommand("request", cmd_request)
@@ -223,7 +228,8 @@ function main()
 			cl7 = solyanka_ini.bools.cl7 and imgui.ImBool(true) or imgui.ImBool(false),
 			autocl = solyanka_ini.bools.autocl and imgui.ImBool(true) or imgui.ImBool(false),
 			seedo = solyanka_ini.bools.seedo and imgui.ImBool(true) or imgui.ImBool(false),
-			psihosbiv = solyanka_ini.bools.psihosbiv and imgui.ImBool(true) or imgui.ImBool(false)
+			psihosbiv = solyanka_ini.bools.psihosbiv and imgui.ImBool(true) or imgui.ImBool(false),
+			house = solyanka_ini.bools.house and imgui.ImBool(true) or imgui.ImBool(false)
 		}
 		
 		buffer = {
@@ -235,7 +241,6 @@ function main()
 		needtoreload = true
 		chatManager.initQueue()
 		lua_thread.create(chatManager.checkMessagesQueueThread)
-		--getoffmembers()
 		
 		script.loaded = true
 		script.sendMessage("Скрипт by " .. unpack(thisScript().authors) .. " запущен. Открыть главное меню - /solyanka")
@@ -258,6 +263,16 @@ function main()
 			if suspendkeys == 2 then
 				rkeys.registerHotKey(makeHotKey('psiho'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSendChat("/grib heal") end)
 				suspendkeys = 0
+			end
+			
+			-- Активация быстрого меню скрипта
+			if isKeyDown(makeHotKey('fast')[1]) and not menu.main.v and not sampIsChatInputActive() and not sampIsDialogActive(-1) and not isSampfuncsConsoleActive() then 
+				wait(0) 
+				menu.fast.v = true 
+				else 
+				wait(0) 
+				menu.fast.v = false 
+				imgui.ShowCursor = false 
 			end
 			
 			if not menu.main.v then 
@@ -510,6 +525,9 @@ function imgui.OnDrawFrame()
 			imgui.Hotkey("hotkey1", "psiho", 100) 
 			imgui.SameLine()
 			imgui.Text("Употребить психохил\n(/grib heal)") 
+			imgui.Hotkey("hotkey2", "fast", 100) 
+			imgui.SameLine()
+			imgui.Text("Открыть меню экстренных сообщений\n(камера; снять маску; вызвать полицию по департаменту; поздороваться с бойцами)") 
 			imgui.Text("Введите ваш тэг в рацию")
 			imgui.SameLine() 
 			imgui.PushItemWidth(120)
@@ -555,6 +573,13 @@ function imgui.OnDrawFrame()
 			end
 			imgui.SameLine() 
 			imgui.Text("Сбивать анимацию приёма психохила чатом")
+			
+			if imgui.ToggleButton("house", togglebools.house) then 
+				solyanka_ini.bools.house = togglebools.house.v
+				inicfg.save(solyanka_ini, settings)
+			end
+			imgui.SameLine() 
+			imgui.Text("Сохранять дату слёта недвижимости в базу данных скрипта и упоминать о её слёте")
 			
 			imgui.EndChild()
 		end
@@ -635,9 +660,7 @@ function imgui.OnDrawFrame()
 			imgui.EndChild()
 			if imgui.Button("Обновить информацию из базы данных", imgui.ImVec2(270.0, 26.0)) then
 				lua_thread.create(function()
-					script.admin.info = nil
-					response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
-					script.admin.info = decodeJson(response)
+					script.updateAdminInformation()
 				end)
 			end
 			if imgui.Button("Добавить пользователя скрипта", imgui.ImVec2(270.0, 26.0)) then
@@ -665,15 +688,13 @@ function imgui.OnDrawFrame()
 					end
 					menu.add.v = false
 					script.sendMessage("Выполняю...")
-					response = req(macros .. "=add&nick=" .. nick .. "&admin=" .. currentNick .. "&password=" .. script.password)
-					if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					response = req(macros .. "=add&nick=" .. nick .. "&admin=" .. mynick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
 					if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
 					if response == "You're not admin" then script.sendMessage("У вас отсутвуют права администратора скрипта!") end
 					if response == "Successfuly added" then 
 						script.sendMessage("Игрок был добавлен в базу данных скрипта!") 
-						script.admin.info = nil
-						response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
-						script.admin.info = decodeJson(response)
+						script.updateAdminInformation()
 					end
 				end)
 			end
@@ -691,15 +712,16 @@ function imgui.OnDrawFrame()
 				lua_thread.create(function()
 					menu.remove.v = false
 					script.sendMessage("Выполняю...")
-					response = req(macros .. "=remove&nick=" .. menu.removenick .. "&admin=" .. currentNick .. "&password=" .. script.password)
-					if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					response = req(macros .. "=remove&nick=" .. menu.removenick .. "&admin=" .. mynick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
 					if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
 					if response == "You're not admin" then script.sendMessage("У вас отсутвуют права администратора скрипта!") end
-					if response == "Successfuly removed" or response == "Unsuccessfuly removed" then 
+					if response == "Successfuly removed" then 
 						script.sendMessage("Игрок был удалён из базы данных скрипта!")
-						script.admin.info = nil
-						response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
-						script.admin.info = decodeJson(response)
+						script.updateAdminInformation()
+					end
+					if response == "Unsuccessfuly removed" then 
+						script.sendMessage("Не удалось удалить игрока из базы данных!")
 					end
 				end)
 			end
@@ -717,16 +739,16 @@ function imgui.OnDrawFrame()
 				lua_thread.create(function()
 					menu.change.v = false
 					script.sendMessage("Выполняю...")
-					response = req(macros .. "=change&nick=" .. menu.changenick .. "&admin=" .. currentNick .. "&password=" .. script.password)
-					if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					response = req(macros .. "=change&nick=" .. menu.changenick .. "&admin=" .. mynick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
 					if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
 					if response == "You're not admin" then script.sendMessage("У вас отсутвуют права администратора скрипта!") end
 					local newstatus = response:match("Successfuly changed as (.*)")
 					if newstatus ~= nil then 
 						script.sendMessage(newstatus == "admin" and "Пользователь был успешно назначен администратором скрипта" or "Пользователь был лишён прав администратора")
-						script.admin.info = nil
-						response = req(macros .. "=get&admin=" .. currentNick .. "&password=" .. script.password)
-						script.admin.info = decodeJson(response)
+						script.updateAdminInformation()
+						else
+						script.sendMessage("Не удалось изменить статус пользователя.")
 					end
 				end)
 			end
@@ -770,21 +792,54 @@ function imgui.OnDrawFrame()
 		imgui.End()
 	end
 	
-	if menu.interaction.v then
+	if menu.fast.v then -- быстрое меню скрипта
+		imgui.SwitchContext()
+		colors[clr.WindowBg] = ImVec4(0.06, 0.06, 0.06, 0.94)
+		imgui.ShowCursor = true
+		imgui.LockPlayer = true
+		local sw, sh = getScreenResolution()
+		imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+		imgui.SetNextWindowSize(imgui.ImVec2(1000, 250), imgui.Cond.FirstUseEver, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
+		imgui.Begin("Быстрое меню скрипта", menu.fast, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
+		imgui.BeginChild('fast', imgui.ImVec2(985, 195), true)
+		local strings = {
+			[1] = {name = "Включить камеру", strings = {"/me включил камеру на бронежилете", "/do Камера включена и записывает всё происходящее на удалённый сервер."}},
+			[2] = {name = "Статус записи", strings = {"/do Камера включена и записывает всё происходящее на удалённый сервер."}},
+			[3] = {name = "Выключить камеру", strings = {"/me выключил камеру", "/do Камера выключена, запись сохранена на удалённый сервер."}},
+			[4] = {name = "Стянуть маску", strings = {"/me резко стянул маску с лица человека", "/do Лицо полностью видно."}},
+			[5] = {name = "Запросить полицейских департаменте", strings = {"/dep SAPD, требуется экипаж в секторе " .. sector()}},
+			[6] = {name = "Поздароваться с военнослужащими", strings = {"/f " .. tag .. "Здравия желаю, товарищи!"}},
+		}
+		for k, v in ipairs(strings) do
+			imgui.PushID(k)
+			if imgui.Button(v.name, imgui.ImVec2(970, 25.0)) then
+				for _, string in ipairs(v.strings) do 
+					chatManager.addMessageToQueue(string)
+				end
+				menu.interaction.v = false
+			end
+			imgui.PopID()
+		end
+		imgui.EndChild()
+		imgui.End()
+	end
+	
+	if menu.interaction.v then -- меню взаимодействия с военнослужащим
 		imgui.SwitchContext()
 		colors[clr.WindowBg] = ImVec4(0.06, 0.06, 0.06, 0.94)
 		imgui.ShowCursor = true
 		local sw, sh = getScreenResolution()
 		imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+		local prank, psurname, myrank, mysurname = zv[targetRank], targetNick:match(".*%_(.*)"), zv[playerRank], playerNick:match(".*%_(.*)")
 		imgui.SetNextWindowSize(imgui.ImVec2(1000, 250), imgui.Cond.FirstUseEver, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
-		imgui.Begin("Меню взаимодействия с военнослужащим: " .. zv[targetRank] .. " " .. targetNick:gsub("_", " "), menu.interaction, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
+		imgui.Begin("Меню взаимодействия с военнослужащим: " .. prank .. " " .. targetNick:gsub("_", " "), menu.interaction, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
 		imgui.BeginChild('interaction', imgui.ImVec2(985, 195), true)
 		local strings = {
-			[1] = "Здравия желаю, товарищ " .. zv[targetRank] .. " " .. targetNick:match(".*%_(.*)") .. "!",
-			[2] = "Товарищ " .. zv[targetRank] .. " " .. targetNick:match(".*%_(.*)"),
-			[3] = "Товарищ " .. zv[targetRank] .. " " .. targetNick:match(".*%_(.*)") .. " разрешите обратится? Товарищ " .. zv[playerRank] .. " " .. playerNick:match(".*%_(.*)"),
-			[4] = "Товарищ " .. zv[targetRank] .. " " .. targetNick:match(".*%_(.*)") .. " разрешите встать в строй?",
-			[5] = "Товарищ " .. zv[targetRank] .. " " .. targetNick:match(".*%_(.*)") .. ", товарищ " .. zv[playerRank] .. " " .. playerNick:match(".*%_(.*)") .. " по вашему приказу прибыл!"
+		[1] = "Здравия желаю, товарищ " .. prank .. " " .. psurname .. "!",
+		[2] = "Товарищ " .. prank .. " " .. psurname,
+		[3] = "Товарищ " .. prank .. " " .. psurname .. " разрешите обратится? Товарищ " .. myrank .. " " .. mysurname,
+		[4] = "Товарищ " .. prank .. " " .. psurname .. " разрешите встать в строй?",
+		[5] = "Товарищ " .. prank .. " " .. psurname .. ", товарищ " .. myrank .. " " .. mysurname .. " по вашему приказу прибыл!"
 		}
 		for k, v in ipairs(strings) do
 			imgui.PushID(k)
@@ -800,11 +855,10 @@ function imgui.OnDrawFrame()
 	
 	imgui.SwitchContext() -- Overlay
 	colors[clr.WindowBg] = ImVec4(0, 0, 0, 0)
-	local SetModeCond = SetMode and 0 or 4
 	
 	if menu.target.v then
-		if not SetMode then imgui.SetNextWindowPos(imgui.ImVec2(500, 500)) else if SetModeFirstShow then imgui.SetNextWindowPos(imgui.ImVec2(500, 500)) end end -- таргет-меню
-		imgui.Begin('#empty_field', menu.target, 1 + 32 + 2 + SetModeCond + 64)
+		imgui.SetNextWindowPos(imgui.ImVec2(500, 500))
+		imgui.Begin('#empty_field', menu.target, 1 + 32 + 2 + 4 + 64)
 		if targetId ~= nil and targetNick ~= nil then
 			local targetClist = "{" .. ("%06x"):format(bit.band(sampGetPlayerColor(targetId), 0xFFFFFF)) .. "}"
 			imgui.TextColoredRGB('Текущая цель: ' .. (targetClist ~= nil and targetClist or '') .. targetNick .. '[' .. targetId .. ']')
@@ -842,7 +896,7 @@ function ev.onServerMessage(col, text)
 		end
 		if solyanka_ini.bools.psihosbiv and col == -1 then
 			if (text:match(u8:decode"^ Здоровье %d+%/%d+%. Сытость %d+%/%d+%. У вас осталось %d+%/%d+% психохила$") or text:match(u8:decode"^ Вы истощены%. Здоровье снижено до %d+%/%d+%. У вас осталось %d+%/%d+% психохила$")) and not isCharInAnyCar(PLAYER_PED) then
-				lua_thread.create(function() sampSendChat(" ") end)
+				lua_thread.create(function() wait(1) sampSendChat(" ") end)
 			end
 		end
 		if text:match(u8:decode"[Уу]дост") then
@@ -922,24 +976,46 @@ function ev.onServerMessage(col, text)
 				local res, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
 				local myclist = clists.numbers[sampGetPlayerColor(myid)]
 				if myclist == 0 then
-					if tonumber(solyanka_ini.values.clist) ~= 0 then sampProcessChatInput("/cl " .. solyanka_ini.values.clist .. "") end
+					local cl = tonumber(solyanka_ini.values.clist)
+					if cl ~= nil and cl ~= 0 then
+						chatManager.addMessageToQueue("/clist " .. tostring(cl))
+						chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[cl]))
+					end
 				end
+			end
+		end
+		if solyanka_ini.bools.house then
+			local when = text:match(u8:decode"^ Домашний счёт оплачен до (%d%d%d%d%/%d%d%/%d%d %d%d%:%d%d)")
+			if when ~= nil then
+				lua_thread.create(function()
+					local datetime = {}
+					datetime.year, datetime.month, datetime.day, datetime.hour = when:match("(%d%d%d%d)%/(%d%d)%/(%d%d) (%d%d%:%d%d)")
+					script.house = datetime -- перевод даты из string в datetime массив
+					script.whenhouse()
+					local response = req(macros .. "=house&when=" .. when .. "&nick=" .. mynick .. "&password=" .. script.password)
+					if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+					if response == "Wrong password" then script.sendMessage("Неверный пароль, попробуйте ещё раз — /sologin") return end
+					if response == "House date was changed" then script.sendMessage("Дата слёта была успешно выгружена в базу данных!") return end
+					if response == "Error" then script.sendMessage("Не удалось обновить дату слёта в базе данных!") return end
+				end)
 			end
 		end
 	end
 end
 
 function ev.onSendDeathNotification(reason, id)
-	if solyanka_ini.bools.autocl then
-		local result, sid = sampGetPlayerSkin(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
-		if sid == 287 or sid == 191 then
-			local cl = solyanka_ini.values.clist
-			if cl ~= nil then
-				lua_thread.create(function()
-					repeat wait(0) until getActiveInterior() ~= 0
-					chatManager.addMessageToQueue("/clist " .. cl)
-					chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[cl]))
-				end)
+	if script.loaded then
+		if solyanka_ini.bools.autocl then
+			local result, sid = sampGetPlayerSkin(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+			if sid == 287 or sid == 191 then
+				local cl = solyanka_ini.values.clist
+				if cl ~= nil then
+					lua_thread.create(function()
+						repeat wait(0) until getActiveInterior() ~= 0
+						chatManager.addMessageToQueue("/clist " .. cl)
+						chatManager.addMessageToQueue("/me надел" .. a .. u8(belka_ini.UserClist[cl]))
+					end)
+				end
 			end
 		end
 	end
@@ -949,6 +1025,7 @@ function ev.onSendChat(message)
 	chatManager.lastMessage = message
 	chatManager.updateAntifloodClock()
 end
+
 
 function ev.onSendCommand(message)
 	chatManager.lastMessage = message
@@ -1162,6 +1239,41 @@ function imgui.Hotkey(name, numkey, width)
 	end
 end
 
+function sector()
+    local KV = {
+        [1] = "А",
+        [2] = "Б",
+        [3] = "В",
+        [4] = "Г",
+        [5] = "Д",
+        [6] = "Ж",
+        [7] = "З",
+        [8] = "И",
+        [9] = "К",
+        [10] = "Л",
+        [11] = "М",
+        [12] = "Н",
+        [13] = "О",
+        [14] = "П",
+        [15] = "Р",
+        [16] = "С",
+        [17] = "Т",
+        [18] = "У",
+        [19] = "Ф",
+        [20] = "Х",
+        [21] = "Ц",
+        [22] = "Ч",
+        [23] = "Ш",
+        [24] = "Я",
+	}
+    local X, Y, Z = getCharCoordinates(playerPed)
+    X = math.ceil((X + 3000) / 250)
+    Y = math.ceil((Y * - 1 + 3000) / 250)
+    Y = KV[Y]
+    local KVX = (Y.."-"..X)
+    return KVX
+end
+
 function sampGetPlayerSkin(id)
 	if not id or not sampIsPlayerConnected(tonumber(id)) and not tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) then return false end -- проверяем параметр
 	local isLocalPlayer = tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) -- проверяем, является ли цель локальным игроком
@@ -1173,35 +1285,35 @@ function sampGetPlayerSkin(id)
 	return true, skinid -- возвращаем статус и ID скина
 end
 
-function checkaccess(p)
+function script.login(p)
 	lua_thread.create(function()
 		if p == nil or p == "" then
 			if script.password == nil or script.password == "" then
 				wait(1300)
 				if not showdialog(3, u8:decode"Введите ваш пароль:", u8:decode"Если авторизируетесь впервые — пароль будет запрошен повторно", u8:decode"Отправить") then script.sendMessage("Ошибка при создании диалогового окна.") return end
 				local res = waitForChooseInDialog(3)
-				if not res or res == "" then script.sendMessage("Диалог был закрыт, попробуйте /sologin") return end
+				if not res or res == "" then script.sendMessage("Диалог был закрыт. Попробуйте /sologin [пароль]") return end
 				script.password = res
 			end
 			p = script.password
 		end
 		print(u8:decode"Осуществляю попытку авторизации...")
-		local response = req(macros .. "=login&nick=" .. currentNick .. "&password=" .. p)
+		local response = req(macros .. "=login&nick=" .. mynick .. "&password=" .. p)
 		if response ~= nil then
 			if response == "Wrong password" then
 				script.sendMessage("Неверный пароль, попробуйте ещё раз — /sologin")
 				return
 			end
-			if response == "Access denied" then script.sendMessage(currentNick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+			if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
 			if response == "Need to register" then 
-				script.sendMessage(currentNick:gsub("_", " ") .. " — необходима регистрация...") 
+				script.sendMessage(mynick:gsub("_", " ") .. " — необходима регистрация...") 
 				if not showdialog(1, u8:decode"Введите ваш новый пароль:", u8:decode"Будьте осторожны при вводе!", u8:decode"Отправить") then script.sendMessage("Ошибка при создании диалогового окна.") return end
 				local res = waitForChooseInDialog(1)
-				if not res or res == "" then script.sendMessage("Диалог был закрыт.") return end
+				if not res or res == "" then script.sendMessage("Диалог был закрыт. Попробуйте /sologin [пароль]") return end
 				script.password = res
 				p = script.password
 				script.sendMessage("Осуществляю попытку регистрации...")
-				local response = req(macros .. "=login&nick=" .. currentNick .. "&password=" .. p .. "&reg=true")
+				local response = req(macros .. "=login&nick=" .. mynick .. "&password=" .. p .. "&reg=true")
 				if response == "Successful registration" then
 					script.sendMessage("Вы успешно зарегистрировались, сохраняю ваш пароль и перезагружаю скрипт...")
 					solyanka_ini.values.password = script.password
@@ -1211,11 +1323,12 @@ function checkaccess(p)
 					return
 				end
 			end
-			print(currentNick:gsub("_", " ") .. u8:decode" — успешная авторизация!")
+			print(mynick:gsub("_", " ") .. u8:decode" — успешная авторизация!")
 			local info = decodeJson(response)
 			if info ~= nil then
 				script.admin.status = info.admin.status == "true" and true or false
 				script.admin.info = info.admin.info
+				script.house = info.house
 				script.v.num = info.version
 				script.v.date = info.date
 				script.url = info.url
@@ -1230,10 +1343,18 @@ function checkaccess(p)
 					return
 				end
 				script.offmembers = info.offmembers
-				if script.offmembers[currentNick] ~= nil then
-					local zv = zv[script.offmembers[currentNick].rank]
-					local otm = script.offmembers[currentNick].week
-					if zv ~= nil and otm ~= nil then script.sendMessage(zv .. " " .. currentNick:match(".*%_(.*)") .. ", у вас {B30000}" .. otm .. "{FFFAFA} отметок") end
+				if script.offmembers[mynick] ~= nil then
+					local zv = zv[script.offmembers[mynick].rank]
+					local otm = script.offmembers[mynick].week
+					if zv ~= nil and otm ~= nil then script.sendMessage(zv .. " " .. mynick:match(".*%_(.*)") .. ", у вас {B30000}" .. otm .. "{FFFAFA} отметок") end
+				end
+				if solyanka_ini.bools.house then
+					if script.house ~= nil then -- если дата в формате string не nil
+						local datetime = {}
+						datetime.year, datetime.month, datetime.day, datetime.hour = script.house:match("(%d%d%d%d)%/(%d%d)%/(%d%d) (%d%d%:%d%d)")
+						script.house = datetime -- перевод даты из string в datetime массив
+						script.whenhouse()
+					end
 				end
 				script.checked = true
 				solyanka_ini.values.password = p
@@ -1252,6 +1373,22 @@ function checkaccess(p)
 	end)
 end
 
+function script.updateAdminInformation()
+	script.admin.info = nil
+	response = req(macros .. "=get&admin=" .. mynick .. "&password=" .. script.password)
+	if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+	if response == "Wrong password" then script.sendMessage("Неверный пароль!") end
+	script.admin.info = decodeJson(response)
+end
+
+function script.whenhouse()
+	local days = math.floor((os.difftime(os.time(script.house), os.time())) / 3600 / 24)
+	if days <= 0 then script.sendMessage(warningprefix .. "НЕДВИЖИМОСТЬ ВОЗМОЖНО УЖЕ СЛЕТЕЛА! ЕСЛИ У ВАС НЕТ ДОМА - ОТКЛЮЧИТЕ ФУНКЦИЮ!")
+		elseif days <= 7 then script.sendMessage(warningprefix .. "Срочно оплатите недвижимость! У вас осталось " .. days .. " дней")
+		elseif days > 7 then script.sendMessage("Недвижимость слетит через " .. days .. " дней")
+	end
+end
+
 function cmd_changepassword(sparams)
 	if sparams == "" then script.sendMessage("Неправильно блять! Введи — /changepassword [old] [new]") return end
 	local params = {}
@@ -1259,8 +1396,8 @@ function cmd_changepassword(sparams)
 	if params[1] == nil or params[1] == "" or params[2] == nil or params[2] == "" then script.sendMessage("Неправильно блять! Введи — /changepassword [old] [new]") return end
 	lua_thread.create(function()
 		script.sendMessage("Осуществляюю попытку смены пароля...") 
-		local response = req(macros .. "=changepassword&nick=" .. currentNick .. "&old=" .. params[1] .. "&new=" .. params[2])
-		if response == "Access denied" then script.sendMessage(currentnick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+		local response = req(macros .. "=changepassword&nick=" .. mynick .. "&old=" .. params[1] .. "&new=" .. params[2])
+		if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
 		if response == "Successfuly changed" then 
 			script.sendMessage("Пароль был успешно изменён!") 
 			solyanka_ini.values.password = params[2]
