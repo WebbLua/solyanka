@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
-script_version("31.05.2023")
-script_version_number(16)
+script_version("32.05.2023")
+script_version_number(17)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
@@ -12,6 +12,8 @@ local script = { -- технические переменные скрипта
 		info = nil -- информация для администраторов
 	},
 	house = nil, -- дата слёта дома
+	zv = nil, -- ваше звание
+	otm = nil, -- ваши отметки
 	freereq = true, -- свободна ли функция req() для выполнения запроса
 	complete = true, -- завершена ли загрузка
 	update = false, -- статус обновления
@@ -34,6 +36,7 @@ local cmds = { -- команды скрипта
 }
 local var = { -- игровые переменные скрипта
 	needtocl = true, -- необходимо надеть 7 клист
+	satiety = nil -- показатель сытости (для психохила)
 }
 -------------------------------------------------------------------------[Библиотеки/Зависимости]---------------------------------------------------------------------
 local ev = require 'samp.events'
@@ -57,6 +60,7 @@ local config = {
 		autocl = false,
 		seedo = false,
 		psihosbiv = false,
+		sbivgrib = false,
 		house = false
 	},
 	hotkey = {
@@ -150,6 +154,8 @@ local clists = {
 	}
 }
 
+local sbiv = {"Готовой рыбой", "Готовыми грибами"}
+
 local zv = { -- массив наименований званий согласно их реальному порядку
 	"Рядовой", "Ефрейтор", "Младший сержант", "Сержант", "Старший сержант", 
 	"Старшина", "Прапорщик", "Младший лейтенант", "Лейтенант", "Старший лейтенант", 
@@ -204,7 +210,9 @@ function main()
 	tag = solyanka_ini.values.tag ~= "" and solyanka_ini.values.tag .. " " or "" -- тэг из локального конфига скрипта
 	a = solyanka_ini.bools.sex and "а " or " " -- буква 'a' для пола в отыгровках
 	
-	script.login() -- проверка доступа по паролю
+	sampRegisterChatCommand('timemask', timemask)
+	
+	script.logging() -- проверка доступа по паролю
 	sampRegisterChatCommand('sologin', 
 		function(p) 
 			lua_thread.create(function()
@@ -215,10 +223,9 @@ function main()
 					p = res
 				end
 				script.sendMessage("Осуществляю попытку авторизации...")
-				script.login(p)
+				script.logging(p)
 			end)
 		end)
-		sampRegisterChatCommand("request", cmd_request)
 		
 		while not script.checked do wait(0) end
 		sampUnregisterChatCommand("sologin")
@@ -234,7 +241,8 @@ function main()
 		
 		buffer = {
 			clist = imgui.ImInt(solyanka_ini.values.clist),
-			tag = imgui.ImBuffer(solyanka_ini.values.tag, 256)
+			tag = imgui.ImBuffer(solyanka_ini.values.tag, 256),
+			sbiv = imgui.ImInt(solyanka_ini.bools.sbivgrib and "1" or "0")
 		}
 		
 		imgui.Process = true
@@ -245,6 +253,16 @@ function main()
 		script.loaded = true
 		script.sendMessage("Скрипт by " .. unpack(thisScript().authors) .. " запущен. Открыть главное меню - /solyanka")
 		
+		sampRegisterChatCommand("sol", function()
+			for k, v in pairs(solyanka_ini.hotkey) do 
+				local hk = makeHotKey(k) 
+				if tonumber(hk[1]) ~= 0 then 
+					rkeys.unRegisterHotKey(hk) 
+				end 
+			end
+			suspendkeys = 1
+			menu.main.v = not menu.main.v
+		end)
 		sampRegisterChatCommand("solyanka", function()
 			for k, v in pairs(solyanka_ini.hotkey) do 
 				local hk = makeHotKey(k) 
@@ -261,8 +279,20 @@ function main()
 			wait(0)
 			
 			if suspendkeys == 2 then
-				rkeys.registerHotKey(makeHotKey('psiho'), true, function() if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then return end sampSendChat("/grib heal") end)
-				suspendkeys = 0
+				rkeys.registerHotKey(makeHotKey('psiho'), true, 
+					function() 
+						if sampIsChatInputActive() or sampIsDialogActive(-1) or isSampfuncsConsoleActive() then 
+							return 
+						end
+						if var.satiety == nil then sampSendChat("/grib heal") return end
+						if var.satiety > 20 then 
+							sampSendChat("/grib heal") 
+							else 
+							chatManager.addMessageToQueue((solyanka_ini.bools.sbivgrib and "/grib" or "/fish") .. " eat")
+							chatManager.addMessageToQueue("/grib heal") 
+						end 
+					end)
+					suspendkeys = 0
 			end
 			
 			-- Активация быстрого меню скрипта
@@ -516,18 +546,15 @@ function imgui.OnDrawFrame()
 		if menu.settings.v and not menu.information.v then
 			imgui.BeginChild('settings', imgui.ImVec2(800, 460), true)
 			
+			imgui.BeginChild('personal', imgui.ImVec2(785, 120), true)
+			imgui.Text("Выберите ваш основной клист") 
+			imgui.SameLine()
 			imgui.PushItemWidth(200)
 			if imgui.Combo("##Combo", buffer.clist, clists.names) then 
 				solyanka_ini.values.clist = tostring(buffer.clist.v)
 				inicfg.save(solyanka_ini, settings) 
 			end
-			imgui.PopItemWidth() 
-			imgui.Hotkey("hotkey1", "psiho", 100) 
-			imgui.SameLine()
-			imgui.Text("Употребить психохил\n(/grib heal)") 
-			imgui.Hotkey("hotkey2", "fast", 100) 
-			imgui.SameLine()
-			imgui.Text("Открыть меню экстренных сообщений\n(камера; снять маску; вызвать полицию по департаменту; поздороваться с бойцами)") 
+			imgui.PopItemWidth()
 			imgui.Text("Введите ваш тэг в рацию")
 			imgui.SameLine() 
 			imgui.PushItemWidth(120)
@@ -545,6 +572,16 @@ function imgui.OnDrawFrame()
 			end
 			imgui.SameLine() 
 			imgui.Text("Женский пол")
+			imgui.Text("Ваше звание из srp-addons: " .. (script.zv ~= nil and script.zv or "Неизвестно"))
+			imgui.TextColoredRGB("Количество отметок: " .. (script.otm ~= nil and "{B30000}" .. script.otm or "Неизвестно"))
+			imgui.EndChild()
+			
+			imgui.Hotkey("hotkey1", "psiho", 100) 
+			imgui.SameLine()
+			imgui.Text("Употребить психохил\n(/grib heal)") 
+			imgui.Hotkey("hotkey2", "fast", 100) 
+			imgui.SameLine()
+			imgui.Text("Открыть меню экстренных сообщений\n(камера; снять маску; вызвать полицию по департаменту; поздороваться с бойцами)")
 			
 			if imgui.ToggleButton("cl7", togglebools.cl7) then 
 				solyanka_ini.bools.cl7 = togglebools.cl7.v
@@ -572,7 +609,16 @@ function imgui.OnDrawFrame()
 				inicfg.save(solyanka_ini, settings)
 			end
 			imgui.SameLine() 
-			imgui.Text("Сбивать анимацию приёма психохила чатом")
+			imgui.Text("Сбивать анимацию приёма психохила чатом" .. (solyanka_ini.bools.psihosbiv and " | Если мало HP, то пополнять сытость:" or ""))
+			if solyanka_ini.bools.psihosbiv then
+				imgui.SameLine()
+				imgui.PushItemWidth(200)
+				if imgui.Combo("##Combo1", buffer.sbiv, sbiv) then 
+					solyanka_ini.bools.sbivgrib = buffer.sbiv.v == 1 and true or false
+					inicfg.save(solyanka_ini, settings) 
+				end
+				imgui.PopItemWidth() 
+			end
 			
 			if imgui.ToggleButton("house", togglebools.house) then 
 				solyanka_ini.bools.house = togglebools.house.v
@@ -629,7 +675,7 @@ function imgui.OnDrawFrame()
 					end
 					imgui.PopID()
 					imgui.NextColumn()
-					imgui.TextColoredRGB(v.date)
+					imgui.Text(v.date)
 					imgui.NextColumn()
 				end
 				imgui.EndChild()
@@ -803,10 +849,10 @@ function imgui.OnDrawFrame()
 		imgui.Begin("Быстрое меню скрипта", menu.fast, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
 		imgui.BeginChild('fast', imgui.ImVec2(985, 195), true)
 		local strings = {
-			[1] = {name = "Включить камеру", strings = {"/me включил камеру на бронежилете", "/do Камера включена и записывает всё происходящее на удалённый сервер."}},
+			[1] = {name = "Включить камеру", strings = {"/me включил" .. a .. "камеру на бронежилете", "/do Камера включена и записывает всё происходящее на удалённый сервер."}},
 			[2] = {name = "Статус записи", strings = {"/do Камера включена и записывает всё происходящее на удалённый сервер."}},
-			[3] = {name = "Выключить камеру", strings = {"/me выключил камеру", "/do Камера выключена, запись сохранена на удалённый сервер."}},
-			[4] = {name = "Стянуть маску", strings = {"/me резко стянул маску с лица человека", "/do Лицо полностью видно."}},
+			[3] = {name = "Выключить камеру", strings = {"/me выключил" .. a .. "камеру", "/do Камера выключена, запись сохранена на удалённый сервер."}},
+			[4] = {name = "Стянуть маску", strings = {"/me резко стянул" .. a .. "маску с лица человека", "/do Лицо полностью видно."}},
 			[5] = {name = "Запросить полицейских департаменте", strings = {"/dep SAPD, требуется экипаж в секторе " .. sector()}},
 			[6] = {name = "Поздароваться с военнослужащими", strings = {"/f " .. tag .. "Здравия желаю, товарищи!"}},
 		}
@@ -835,11 +881,11 @@ function imgui.OnDrawFrame()
 		imgui.Begin("Меню взаимодействия с военнослужащим: " .. prank .. " " .. targetNick:gsub("_", " "), menu.interaction, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoScrollbar)
 		imgui.BeginChild('interaction', imgui.ImVec2(985, 195), true)
 		local strings = {
-		[1] = "Здравия желаю, товарищ " .. prank .. " " .. psurname .. "!",
-		[2] = "Товарищ " .. prank .. " " .. psurname,
-		[3] = "Товарищ " .. prank .. " " .. psurname .. " разрешите обратится? Товарищ " .. myrank .. " " .. mysurname,
-		[4] = "Товарищ " .. prank .. " " .. psurname .. " разрешите встать в строй?",
-		[5] = "Товарищ " .. prank .. " " .. psurname .. ", товарищ " .. myrank .. " " .. mysurname .. " по вашему приказу прибыл!"
+			[1] = "Здравия желаю, товарищ " .. prank .. " " .. psurname .. "!",
+			[2] = "Товарищ " .. prank .. " " .. psurname,
+			[3] = "Товарищ " .. prank .. " " .. psurname .. " разрешите обратится? Товарищ " .. myrank .. " " .. mysurname,
+			[4] = "Товарищ " .. prank .. " " .. psurname .. " разрешите встать в строй?",
+			[5] = "Товарищ " .. prank .. " " .. psurname .. ", товарищ " .. myrank .. " " .. mysurname .. " по вашему приказу прибыл!"
 		}
 		for k, v in ipairs(strings) do
 			imgui.PushID(k)
@@ -894,9 +940,18 @@ function ev.onServerMessage(col, text)
 				end
 			end
 		end
-		if solyanka_ini.bools.psihosbiv and col == -1 then
-			if (text:match(u8:decode"^ Здоровье %d+%/%d+%. Сытость %d+%/%d+%. У вас осталось %d+%/%d+% психохила$") or text:match(u8:decode"^ Вы истощены%. Здоровье снижено до %d+%/%d+%. У вас осталось %d+%/%d+% психохила$")) and not isCharInAnyCar(PLAYER_PED) then
-				lua_thread.create(function() wait(1) sampSendChat(" ") end)
+		if col == -1342193921 then
+			if text:match(u8:decode"^ Сытость полностью восстановлена%. У вас осталось %d+ %/ %d+ пачек рыбы$") then var.satiety = nil end
+			local satiety = tonumber(text:match(u8:decode"^ Сытость пополнена до (%d+)%. У вас осталось %d+%/%d+ готовых грибов$"))
+			if satiety ~= nil then var.satiety = satiety end
+		end
+		if col == -1 then
+			local satiety = tonumber(text:match(u8:decode"^ Здоровье %d+%/%d+%. Сытость (%d+)%/%d+%. У вас осталось %d+%/%d+% психохила$")) or (text:match(u8:decode"^ Вы истощены%. Здоровье снижено до %d+%/%d+%. У вас осталось %d+%/%d+% психохила$") and 0 or nil)
+			if satiety ~= nil then 
+				var.satiety = satiety 
+				if solyanka_ini.bools.psihosbiv and not isCharInAnyCar(PLAYER_PED) then
+					lua_thread.create(function() wait(1) sampSendChat(" ") end)
+				end
 			end
 		end
 		if text:match(u8:decode"[Уу]дост") then
@@ -1285,7 +1340,7 @@ function sampGetPlayerSkin(id)
 	return true, skinid -- возвращаем статус и ID скина
 end
 
-function script.login(p)
+function script.logging(p)
 	lua_thread.create(function()
 		if p == nil or p == "" then
 			if script.password == nil or script.password == "" then
@@ -1297,8 +1352,10 @@ function script.login(p)
 			end
 			p = script.password
 		end
+		
 		print(u8:decode"Осуществляю попытку авторизации...")
 		local response = req(macros .. "=login&nick=" .. mynick .. "&password=" .. p)
+		
 		if response ~= nil then
 			if response == "Wrong password" then
 				script.sendMessage("Неверный пароль, попробуйте ещё раз — /sologin")
@@ -1344,9 +1401,9 @@ function script.login(p)
 				end
 				script.offmembers = info.offmembers
 				if script.offmembers[mynick] ~= nil then
-					local zv = zv[script.offmembers[mynick].rank]
-					local otm = script.offmembers[mynick].week
-					if zv ~= nil and otm ~= nil then script.sendMessage(zv .. " " .. mynick:match(".*%_(.*)") .. ", у вас {B30000}" .. otm .. "{FFFAFA} отметок") end
+					script.zv = zv[script.offmembers[mynick].rank]
+					script.otm = script.offmembers[mynick].week
+					if script.zv ~= nil and script.otm ~= nil then script.sendMessage(script.zv .. " " .. mynick:match(".*%_(.*)") .. ", у вас {B30000}" .. script.otm .. "{FFFAFA} отметок") end
 				end
 				if solyanka_ini.bools.house then
 					if script.house ~= nil then -- если дата в формате string не nil
