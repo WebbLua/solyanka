@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
 script_version("01.06.2023")
-script_version_number(18)
+script_version_number(19)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
@@ -857,7 +857,7 @@ function imgui.OnDrawFrame()
 			[2] = {name = "Статус записи", strings = {"/do Камера включена и записывает всё происходящее на удалённый сервер."}},
 			[3] = {name = "Выключить камеру", strings = {"/me выключил" .. a .. "камеру", "/do Камера выключена, запись сохранена на удалённый сервер."}},
 			[4] = {name = "Стянуть маску", strings = {"/me резко стянул" .. a .. "маску с лица человека", "/do Лицо полностью видно."}},
-			[5] = {name = "Запросить полицейских департаменте", strings = {"/dep SAPD, требуется экипаж в секторе " .. sector()}},
+			[5] = {name = "Запросить полицейских в департамент", strings = {"/dep SAPD, требуется экипаж в секторе " .. sector()}},
 			[6] = {name = "Поздароваться с военнослужащими", strings = {"/f " .. tag .. "Здравия желаю, товарищи!"}},
 		}
 		for k, v in ipairs(strings) do
@@ -878,6 +878,7 @@ function imgui.OnDrawFrame()
 		imgui.SwitchContext()
 		colors[clr.WindowBg] = ImVec4(0.06, 0.06, 0.06, 0.94)
 		imgui.ShowCursor = true
+		imgui.LockPlayer = true
 		local sw, sh = getScreenResolution()
 		imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 		local prank, psurname, myrank, mysurname = zv[targetRank], targetNick:match(".*%_(.*)"), zv[playerRank], playerNick:match(".*%_(.*)")
@@ -1058,6 +1059,33 @@ function ev.onServerMessage(col, text)
 					if response == "Error" then script.sendMessage("Не удалось обновить дату слёта в базе данных!") return end
 				end)
 			end
+		end
+	end
+	if col == -65281 or col == -10270721 then
+		local newnick = text:match(u8:decode'Ваш новый ник %" (.*) %"%. Укажите его в клиенте SA%-MP%, в поле %"Name%"')
+		if newnick ~= nil then
+			lua_thread.create(function()
+				script.sendMessage(warningprefix .. "Обнаружена смена игрового ника!")
+				script.sendMessage(warningprefix .. "Скрипт начинает обновление ников в базе данных... {FF0000}НЕ ВЫХОДИТЕ ИЗ ИГРЫ!!!")
+				local A_Index = 0
+				while true do
+					if A_Index == 20 then break end
+					local text = sampGetChatString(99 - A_Index)
+					
+					local oldnick = text:match(u8:decode".* одобрил%(а%) заявку на смену ника%: (.*) %>%> " .. newnick)
+					if oldnick ~= nil then
+						local response = req(macros .. "=changenick&newnick=" .. newnick .. "&oldnick=" .. oldnick .. "&password=" .. script.password)
+						if response == "Nick was changed" then script.sendMessage("Ник в базе данных успешно обновлён!") end
+						if response == "Access denied" then script.sendMessage(mynick:gsub("_", " ") .. " — доступ к скрипту отсутствует!") script.noaccess = true thisScript():unload() return end
+						if response == "Wrong password" then script.sendMessage("Неверный пароль, свяжитесь с администратором для обновления вручную") end
+						if response == "Error" then script.sendMessage("Не удалось обновить ник в базе данных, свяжитесь с администратором для обновления вручную") end
+						script.sendMessage("Можно выходить из игры.")
+						return 
+					end
+					A_Index = A_Index + 1
+				end
+			end)
+			return false
 		end
 	end
 end
