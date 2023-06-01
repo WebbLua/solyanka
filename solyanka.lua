@@ -567,7 +567,7 @@ function imgui.OnDrawFrame()
 			
 			if imgui.ToggleButton("sex", togglebools.sex) then 
 				solyanka_ini.bools.sex = togglebools.sex.v
-				a = solyanka_ini.bools.sex and "а" or ""
+				a = solyanka_ini.bools.sex and "а " or " "
 				inicfg.save(solyanka_ini, settings)
 			end
 			imgui.SameLine() 
