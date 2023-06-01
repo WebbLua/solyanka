@@ -1,7 +1,7 @@
 script_name('Solyanka of Functions')
 script_author("C.Webb")
 script_version("01.06.2023")
-script_version_number(19)
+script_version_number(20)
 local macros = "https://script.google.com/macros/s/AKfycbyO5cG_ROl_Ar2T2_q6FkYNFdCEKo82Jsr41tzBA5cD7uD05ka46GwxZ3oG1VnXSas/exec?do"
 local req_index = 0
 local script = { -- технические переменные скрипта
@@ -659,10 +659,9 @@ function imgui.OnDrawFrame()
 				imgui.Text("Дата последней авторизации:")
 				imgui.NextColumn()
 				for k, v in ipairs(script.admin.info.access) do
-					local id = sampGetPlayerIdByNickname(v.nick)
 					imgui.Separator()
 					imgui.SetColumnWidth(-1, 500)
-					if imgui.Selectable(v.nick .. (id ~= nil and "[" .. id .. "]" or "")) then
+					if imgui.Selectable(v.nick) then
 						menu.removenick = v.nick
 						menu.remove.v = true
 					end
@@ -688,13 +687,12 @@ function imgui.OnDrawFrame()
 				imgui.Text("Действие:")
 				imgui.NextColumn()
 				for _, v in ipairs(script.admin.info.log) do
-					local id = sampGetPlayerIdByNickname(v.nick)
 					imgui.Separator()
 					imgui.SetColumnWidth(-1, 85)
 					imgui.Text(v.date)
 					imgui.NextColumn()
 					imgui.SetColumnWidth(-1, 200)
-					imgui.Text(v.nick .. (id ~= nil and "[" .. id .. "]" or ""))
+					imgui.Text(v.nick)
 					imgui.NextColumn()
 					imgui.TextColoredRGB(v.action)
 					imgui.NextColumn()
